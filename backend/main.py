@@ -4,6 +4,7 @@ import hmac
 import os
 import secrets
 import time
+from typing import Literal
 
 from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -197,11 +198,12 @@ def list_messages_by_date(
     conv_id: str,
     date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
     tz: float = Query(8, ge=-12, le=14),
+    limit: int = Query(5000, ge=1, le=5000),
 ):
     conv = database.get_conversation(conv_id)
     if not conv:
         raise HTTPException(404, "会话不存在")
-    items = database.get_messages_by_date(conv_id, date, tz_hours=tz)
+    items = database.get_messages_by_date(conv_id, date, tz_hours=tz, limit=limit)
     return {"items": items, "total": len(items), "date": date}
 
 
@@ -244,11 +246,22 @@ def list_senders(conv_id: str):
 
 @app.get("/api/search")
 def search(
-    q: str = Query(..., min_length=1),
+    q: str = Query(""),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    conv_id: str | None = Query(None),
+    start_time: int | None = Query(None, ge=0),
+    end_time: int | None = Query(None, ge=0),
+    media_type: Literal["image", "video", "media"] | None = Query(None),
 ):
-    items, total = database.search_messages(q, page=page, page_size=page_size)
+    if start_time is not None and end_time is not None and start_time >= end_time:
+        raise HTTPException(422, "结束时间必须晚于开始时间")
+    if not q.strip() and not conv_id and start_time is None and end_time is None and not media_type:
+        raise HTTPException(422, "请指定搜索条件")
+    items, total = database.search_messages(
+        q.strip(), page=page, page_size=page_size, conv_id=conv_id,
+        start_time=start_time, end_time=end_time, media_type=media_type,
+    )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 

@@ -151,36 +151,62 @@ def get_senders(conv_id):
     return [dict(r) for r in rows]
 
 
-def search_messages(query, page=1, page_size=50):
+def search_messages(query="", page=1, page_size=50, *, conv_id=None,
+                    start_time=None, end_time=None, media_type=None):
+    """Search text/transcripts with optional conversation, time and media filters.
+
+    Time bounds are [start_time, end_time), so adjacent dates never overlap.
+    """
+    clauses, params = [], []
+    if query:
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        clauses.append("(m.content LIKE ? ESCAPE '\\' OR vt.text_result LIKE ? ESCAPE '\\')")
+        params.extend([pattern, pattern])
+    if conv_id is not None:
+        clauses.append("m.conv_id = ?")
+        params.append(conv_id)
+    if start_time is not None:
+        clauses.append("m.timestamp >= ?")
+        params.append(start_time)
+    if end_time is not None:
+        clauses.append("m.timestamp < ?")
+        params.append(end_time)
+    # Legacy video rows were stored as images/text. Inspect the preserved JSON
+    # as well as the local file; malformed/truncated JSON must not break search.
+    raw = "CASE WHEN json_valid(m.raw_data) THEN m.raw_data ELSE '{}' END"
+    content = f"json_extract({raw}, '$.content_json')"
+    cj = f"CASE WHEN json_valid({content}) THEN {content} ELSE '{{}}' END"
+    video = f"""(m.msg_type = 5 OR COALESCE(lower(m.media_local_path) LIKE '%.mp4', 0)
+                OR (m.msg_type IN (1, 3) AND json_extract({cj}, '$.video.vid') IS NOT NULL))"""
+    if media_type == "image":
+        clauses.append(f"m.msg_type = 3 AND NOT {video}")
+    elif media_type == "video":
+        clauses.append(video)
+    elif media_type == "media":
+        clauses.append(f"(m.msg_type = 3 OR {video})")
+    elif media_type is not None:
+        raise ValueError("未知媒体类型")
+    where = " AND ".join(clauses) or "1=1"
+    joins = """FROM messages m
+               JOIN conversations c ON m.conv_id = c.conv_id
+               LEFT JOIN users u ON m.sender_uid = u.uid
+               LEFT JOIN voice_transcriptions vt ON vt.msg_id = m.msg_id"""
     conn = get_db()
-    offset = (page - 1) * page_size
-    pattern = f"%{query}%"
-
-    rows = conn.execute(
-        """SELECT m.*, c.name as conv_name,
-                  COALESCE(u.nickname, m.sender_name, '') as sender_display_name,
-                  vt.text_result AS voice_transcription,
-                  vt.status AS voice_transcription_status,
-                  vt.error AS voice_transcription_error
-           FROM messages m
-           JOIN conversations c ON m.conv_id = c.conv_id
-           LEFT JOIN users u ON m.sender_uid = u.uid
-           LEFT JOIN voice_transcriptions vt ON vt.msg_id = m.msg_id
-           WHERE m.content LIKE ? OR vt.text_result LIKE ?
-           ORDER BY m.seq DESC
-           LIMIT ? OFFSET ?""",
-        (pattern, pattern, page_size, offset),
-    ).fetchall()
-
-    total = conn.execute(
-        """SELECT COUNT(*) FROM messages m
-           LEFT JOIN voice_transcriptions vt ON vt.msg_id = m.msg_id
-           WHERE m.content LIKE ? OR vt.text_result LIKE ?""",
-        (pattern, pattern),
-    ).fetchone()[0]
-
-    conn.close()
-    return [dict(r) for r in rows], total
+    try:
+        rows = conn.execute(
+            f"""SELECT m.*, c.name as conv_name,
+                       COALESCE(u.nickname, m.sender_name, '') as sender_display_name,
+                       vt.text_result AS voice_transcription,
+                       vt.status AS voice_transcription_status,
+                       vt.error AS voice_transcription_error
+                {joins} WHERE {where}
+                ORDER BY m.seq DESC, m.msg_id DESC LIMIT ? OFFSET ?""",
+            [*params, page_size, (page - 1) * page_size],
+        ).fetchall()
+        total = conn.execute(f"SELECT COUNT(*) {joins} WHERE {where}", params).fetchone()[0]
+        return [dict(r) for r in rows], total
+    finally:
+        conn.close()
 
 
 def get_message(msg_id):

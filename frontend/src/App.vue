@@ -12,6 +12,7 @@ const activeConversation = ref(null)
 const searchHighlight = ref('')
 const jumpToSeq = ref(null)
 const sidebarOpen = ref(false)
+const searchOpen = ref(false)
 
 // Auth
 const authChecking = ref(true)
@@ -108,7 +109,7 @@ function navigateToMessage(item) {
     conv_id: item.conv_id,
     name: item.conv_name || '未知',
   }
-  searchHighlight.value = (item.voice_transcription || item.content)?.substring(0, 20) || ''
+  searchHighlight.value = item.search_query ?? ''
   jumpToSeq.value = item.seq || null
 }
 </script>
@@ -154,7 +155,7 @@ function navigateToMessage(item) {
       <div class="app-toolbar">
         <button class="sidebar-toggle" @click="sidebarOpen = !sidebarOpen">☰</button>
         <div class="app-title">抖音聊天记录</div>
-        <SearchBar @navigate="navigateToMessage" />
+        <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">⌕ 查找聊天记录</button>
         <div class="theme-switcher">
           <button
             v-for="t in themes"
@@ -167,17 +168,26 @@ function navigateToMessage(item) {
           />
         </div>
       </div>
-      <MessageList
-        :conversation="activeConversation"
-        :searchHighlight="searchHighlight"
-        :jumpToSeq="jumpToSeq"
-        @jumped="jumpToSeq = null"
-      />
+      <div class="reader-layout">
+        <MessageList
+          :conversation="activeConversation"
+          :searchHighlight="searchHighlight"
+          :jumpToSeq="jumpToSeq"
+          @jumped="jumpToSeq = null"
+        />
+        <SearchBar v-if="searchOpen && activeConversation" :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="searchOpen = false" />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.reader-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
+.reader-layout > .msg-panel { min-width: 0; }
+.search-toggle { padding: 5px 10px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.search-toggle:hover:not(:disabled), .search-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.search-toggle:disabled { opacity: .4; cursor: default; }
+
 .login-screen {
   display: flex;
   align-items: center;
@@ -292,10 +302,6 @@ function navigateToMessage(item) {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-.app-toolbar .search-container {
-  flex: 1;
-  max-width: 400px;
-}
 
 .theme-switcher {
   display: flex;
@@ -395,10 +401,5 @@ function navigateToMessage(item) {
     gap: 5px;
   }
 
-  .app-toolbar .search-container {
-    order: 1;
-    flex-basis: 100%;
-    max-width: none;
-  }
 }
 </style>
