@@ -114,12 +114,15 @@
                 </div>
               </a>
               <ForwardRecords v-else-if="getForwardInfo(msg)" :message="msg" :selfUid="selfUid" />
-              <!-- 表情包 -->
-              <div v-else-if="msg.msg_type === 2 && getEmojiSrc(msg)" class="msg-media">
+              <!-- 表情包（含 type=0 的 515/517/520 漏网） -->
+              <div v-else-if="(msg.msg_type === 2 || isLooseEmoji(msg)) && getEmojiSrc(msg)" class="msg-media">
                 <img :src="getEmojiSrc(msg)" :alt="msg.content" :loading="imgLoading" @click="openLightbox(getEmojiSrc(msg))" @error="onImgError" />
               </div>
+              <div v-else-if="isLooseEmoji(msg)" class="msg-media">
+                <div class="msg-media-missing">[表情]</div>
+              </div>
               <!-- 图片/视频：优先本地原文件，回退到 inline_pic 缩略图 -->
-              <div v-else-if="msg.msg_type === 3" class="msg-media">
+              <div v-else-if="msg.msg_type === 3 || isLooseImage(msg)" class="msg-media">
                 <video
                   v-if="isVideoMsg(msg)"
                   :src="'/media/' + msg.media_local_path"
@@ -136,8 +139,13 @@
                 />
                 <div v-else class="msg-media-missing">[图片已失效]</div>
               </div>
-              <!-- 分享卡片 -->
-              <div v-else-if="msg.msg_type === 4" class="msg-share-card" @click="openShare(msg)">
+              <!-- 分享卡片（含 type=0/1 漏网的作品/地点/直播卡） -->
+              <div
+                v-else-if="isShareCard(msg)"
+                class="msg-share-card"
+                :class="{ 'msg-share-card-poster': isPosterShare(msg) }"
+                @click="openShare(msg)"
+              >
                 <div v-if="getShareInfo(msg).comment || getShareInfo(msg).commentImg" class="msg-share-comment">
                   <span v-if="getShareInfo(msg).commentUser" class="msg-share-comment-user">{{ getShareInfo(msg).commentUser }}：</span>{{ getShareInfo(msg).comment }}
                   <img v-if="getShareInfo(msg).commentImg" :src="getShareInfo(msg).commentImg" class="msg-share-comment-img" :loading="imgLoading" @error="onImgError" />
@@ -181,33 +189,6 @@
                     <span v-if="getVideoDuration(msg)" class="msg-video-dur">{{ getVideoDuration(msg) }}</span>
                   </div>
                 </template>
-              </div>
-              <!-- msg_type=1 但实际是贴纸/表情 JSON -->
-              <div v-else-if="isJsonSticker(msg)" class="msg-media">
-                <img v-if="getStickerUrl(msg)" :src="getStickerUrl(msg)" :loading="imgLoading" @error="onImgError" />
-                <div v-else class="msg-media-missing">[贴纸]</div>
-              </div>
-              <!-- msg_type=1 但实际是分享卡片（JSON content 含 content_title） -->
-              <div v-else-if="isJsonShare(msg)" class="msg-share-card" @click="openShare(msg)">
-                <div v-if="getShareInfo(msg).comment || getShareInfo(msg).commentImg" class="msg-share-comment">
-                  <span v-if="getShareInfo(msg).commentUser" class="msg-share-comment-user">{{ getShareInfo(msg).commentUser }}：</span>{{ getShareInfo(msg).comment }}
-                  <img v-if="getShareInfo(msg).commentImg" :src="getShareInfo(msg).commentImg" class="msg-share-comment-img" :loading="imgLoading" @error="onImgError" />
-                </div>
-                <div class="msg-share-card-inner">
-                  <div class="msg-share-card-body">
-                    <div class="msg-share-card-title">{{ getShareInfo(msg).title || '[分享]' }}</div>
-                    <div v-if="getShareInfo(msg).author" class="msg-share-card-author">
-                      @ {{ getShareInfo(msg).author }}
-                    </div>
-                  </div>
-                  <img
-                    v-if="getShareInfo(msg).cover"
-                    :src="getShareInfo(msg).cover"
-                    class="msg-share-card-cover"
-                    :loading="imgLoading"
-                    @error="onImgError"
-                  />
-                </div>
               </div>
               <!-- 语音消息 -->
               <div v-else-if="isVoiceMsg(msg)" class="msg-bubble msg-voice-bubble">
@@ -281,8 +262,8 @@ import { resolveAvatarUrl } from '@/lib/media'
 import MessageLightbox from './MessageLightbox.vue'
 import {
   clearCjCache, getContentJson, tryParseJson, tryParseShareContent, extractShareTitle,
-  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, getForwardInfo, isSystemMsg, duplicateSystemMessageIds,
-  extractServerMsgIds, isVideoComment, isJsonShare, getShareInfo, getInlinePic,
+  isJsonSystemMsg, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, getForwardInfo, isSystemMsg, duplicateSystemMessageIds,
+  extractServerMsgIds, isVideoComment, isLooseEmoji, isLooseImage, isShareCard, isPosterShare, getShareInfo, getInlinePic,
   isVideoMsg, hasLocalVideo, isJsonVideo, getVideoPoster, getVideoDuration,
   getImageSrc, getEmojiSrc, isRecalled, isVoiceMsg, getVoiceUrl, getVoiceDuration,
   getRefMsg, getRefContent, getRefNickname,
@@ -1253,6 +1234,25 @@ watch(() => props.jumpToSeq, async (seq) => {
   object-fit: cover;
   flex-shrink: 0;
   align-self: center;
+}
+.msg-share-card-poster {
+  max-width: 168px;
+  padding: 8px;
+}
+.msg-share-card-poster .msg-share-card-inner {
+  flex-direction: column;
+  gap: 8px;
+}
+.msg-share-card-poster .msg-share-card-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  align-self: stretch;
+  border-radius: 8px;
+}
+.msg-share-card-poster .msg-share-card-title {
+  font-size: 14px;
+  -webkit-line-clamp: 2;
 }
 .msg-share-card-ref {
   background: var(--bg-tertiary);

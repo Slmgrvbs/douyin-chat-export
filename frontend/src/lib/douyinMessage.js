@@ -33,11 +33,36 @@ export function tryParseJson(str) {
   try { return JSON.parse(str) } catch { return null }
 }
 
+export function firstMediaUrl(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    const first = value[0]
+    return typeof first === 'string' ? first : firstMediaUrl(first)
+  }
+  if (typeof value === 'object') {
+    for (const key of ['url_list', 'origin_url_list', 'medium_url_list', 'large_url_list', 'thumb_url_list']) {
+      const found = firstMediaUrl(value[key])
+      if (found) return found
+    }
+    if (typeof value.url === 'string') return value.url
+    if (typeof value.uri === 'string' && value.uri.startsWith('http')) return value.uri
+  }
+  return ''
+}
+
+export function payloadJson(msg) {
+  return getContentJson(msg) || tryParseJson(msg.content)
+}
+
 export function tryParseShareContent(content) {
   if (!content || !content.startsWith('{')) return null
   try {
     const obj = JSON.parse(content)
-    if (obj.content_title || obj.cover_url) return obj
+    if (
+      obj.content_title || obj.cover_url || obj.poi_name || obj.aweme_poi_id
+      || obj.aweType === 805 || obj.aweType === 2104
+    ) return obj
   } catch {}
   return null
 }
@@ -96,6 +121,7 @@ export function getWatchTogether(msg) {
 export function shouldShow(msg) {
   if (getProfileCard(msg) || getForwardInfo(msg) || isVoiceMsg(msg)) return true
   if (getWatchTogether(msg)) return true       // 一起看视频卡片始终显示
+  if (isLooseEmoji(msg) || isLooseShare(msg) || isLooseImage(msg)) return true
   if (msg.msg_type === 0) return !!renderSystemMsg(msg)
   if (isJsonSystemMsg(msg)) return !!renderSystemMsg(msg)
   return true
@@ -162,6 +188,51 @@ export function isJsonShare(msg) {
   return msg.content.includes('content_title') || msg.content.includes('cover_url')
 }
 
+const LOOSE_EMOJI_AWES = new Set([515, 517, 520])
+const LOOSE_SHARE_AWES = new Set([805, 2104])
+
+// Type-0/1 leftovers that should render as an emoji, not a system line.
+export function isLooseEmoji(msg) {
+  if (isJsonSticker(msg)) return true
+  const cj = payloadJson(msg)
+  return !!cj && LOOSE_EMOJI_AWES.has(Number(cj.aweType))
+}
+
+// Type-0/1 leftovers that should render as a share/location card.
+export function isLooseShare(msg) {
+  if (msg.msg_type === 4) return false
+  if (isJsonShare(msg)) return true
+  const cj = payloadJson(msg)
+  if (!cj) return false
+  if (LOOSE_SHARE_AWES.has(Number(cj.aweType))) return true
+  if (cj.poi_name || cj.cover_info) return true
+  return !!(cj.aweme_poi_id && String(cj.aweme_poi_id))
+}
+
+export function isShareCard(msg) {
+  return msg.msg_type === 4 || isLooseShare(msg)
+}
+
+// Video / live / work shares with a real poster. Product chips stay compact.
+export function isPosterShare(msg) {
+  const source = payloadJson(msg) || tryParseShareContent(msg.content)
+  if (!source || source.im_dynamic_patch) return false
+  return !!(
+    firstMediaUrl(source.cover_url)
+    || firstMediaUrl(source.cover_info?.resource_url)
+    || firstMediaUrl(source.content_thumb)
+  )
+}
+
+// Type-1 leftover that is a photo (inline_pic / check_pics) stored as JSON text.
+export function isLooseImage(msg) {
+  if (msg.msg_type === 3) return false
+  if (isLooseShare(msg) || isLooseEmoji(msg) || isJsonVideo(msg)) return false
+  const cj = payloadJson(msg)
+  if (!cj?.inline_pic) return false
+  return !!(cj.check_pics || cj.is_long_pic != null || cj.create_type != null)
+}
+
 // Share-card info extraction (video share, product card, quoted-video comment).
 export function getShareInfo(msg) {
   const cj = getContentJson(msg)
@@ -188,12 +259,19 @@ export function getShareInfo(msg) {
   // aweType=10500: 引用视频评论 (comment 字段); aweType=700: (text 字段)
   const comment = source.comment || source.text || ''
   const commentUser = source.comment_user_name || ''
-  const commentImg = source.comment_url?.url_list?.[0] || ''
+  const commentImg = firstMediaUrl(source.comment_url)
   const relatedVideo = source.related_share_video || {}
+  const cover = firstMediaUrl(source.cover_url)
+    || firstMediaUrl(source.cover_info?.resource_url)
+    || firstMediaUrl(source.content_thumb)
+    || firstMediaUrl(source.cover_info)
+  const plainContent = (msg.content && !msg.content.startsWith('{')) ? msg.content : ''
   return {
-    title: source.content_title || source.aweme_title || extractShareTitle(msg.content) || '',
+    title: source.content_title || source.aweme_title || source.poi_name
+      || source.push_detail || source.bottom_card_title
+      || extractShareTitle(msg.content) || plainContent || '',
     author: source.content_name || '',
-    cover: source.cover_url?.url_list?.[0] || '',
+    cover,
     itemId: source.itemId || relatedVideo.itemId || '',
     productUrl: '',
     comment,
@@ -248,10 +326,14 @@ export function getImageSrc(msg) {
   return getInlinePic(msg)
 }
 
-// Emoji src: local > CDN URL.
+// Emoji src: local > stored CDN > sticker payload > cj.url.
 export function getEmojiSrc(msg) {
   if (msg.media_local_path) return '/media/' + msg.media_local_path
-  return msg.media_url || null
+  if (msg.media_url) return msg.media_url
+  const sticker = getStickerUrl(msg)
+  if (sticker) return sticker
+  const cj = payloadJson(msg)
+  return firstMediaUrl(cj?.url) || null
 }
 
 // Recalled-message detection.
@@ -375,6 +457,7 @@ export function getForwardInfo(msg) {
 
 export function isSystemMsg(msg) {
   if (getProfileCard(msg) || getForwardInfo(msg) || isVoiceMsg(msg)) return false
+  if (isLooseEmoji(msg) || isLooseShare(msg) || isLooseImage(msg)) return false
   return msg.msg_type === 0 || isJsonSystemMsg(msg)
 }
 

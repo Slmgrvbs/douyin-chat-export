@@ -5,6 +5,7 @@ import {
   isVideoMsg, isJsonVideo, getVideoDuration, getInlinePic, getImageSrc, getEmojiSrc,
   getRefMsg, getRefContent, getRefNickname, extractServerMsgIds, isRecalled,
   getWatchTogether, getProfileCard, getForwardInfo, isSystemMsg, duplicateSystemMessageIds,
+  isLooseEmoji, isLooseShare, isLooseImage, isShareCard, isPosterShare,
 } from './douyinMessage.js'
 
 // Build a message row. content_json is double-encoded inside raw_data, like the DB.
@@ -208,5 +209,65 @@ describe('profile and forwarded cards', () => {
     expect([...duplicateSystemMessageIds([a, b, c])]).toEqual([b.msg_id])
     expect(duplicateSystemMessageIds([a, make('{{1}}赞了你分享的 {{2}}', { sender_uid: 'bob' })]).size).toBe(0)
     expect(duplicateSystemMessageIds([a, make('{{1}}赞了你分享的 {{2}}', { timestamp: 131 })]).size).toBe(0)
+  })
+})
+
+describe('leftover media payload display', () => {
+  it('treats awe 515/517/520 as loose emoji instead of system lines', () => {
+    const emoji = withCj({
+      aweType: 517,
+      url: { url_list: ['http://cdn/e.webp'] },
+    }, { msg_type: 0, content: '{"aweType":517}' })
+    expect(isLooseEmoji(emoji)).toBe(true)
+    expect(getEmojiSrc(emoji)).toBe('http://cdn/e.webp')
+    expect(shouldShow(emoji)).toBe(true)
+    expect(isSystemMsg(emoji)).toBe(false)
+  })
+
+  it('renders poi / awe 805 / 2104 as share cards', () => {
+    const poi = withCj({
+      aweType: 0,
+      poi_name: '某咖啡店',
+      aweme_poi_id: '123',
+      cover_info: { resource_url: { url_list: ['http://cdn/poi.jpg'] } },
+    }, { msg_type: 1, content: '{"poi_name":"某咖啡店"}' })
+    expect(isLooseShare(poi)).toBe(true)
+    expect(getShareInfo(poi).title).toBe('某咖啡店')
+    expect(getShareInfo(poi).cover).toBe('http://cdn/poi.jpg')
+
+    const live = withCj({
+      aweType: 2104,
+      push_detail: '杏仁体',
+      cover_url: { url_list: ['http://cdn/live.jpg'] },
+    }, { msg_type: 0, content: '杏仁体' })
+    expect(isShareCard(live)).toBe(true)
+    expect(getShareInfo(live).title).toBe('杏仁体')
+    expect(shouldShow(live)).toBe(true)
+
+    const work = withCj({
+      aweType: 805,
+      content_title: '作品标题',
+      cover_url: { url_list: ['http://cdn/w.jpg'] },
+      itemId: '99',
+    }, { msg_type: 0, content: '{"aweType":805,"content_title":"作品标题"}' })
+    expect(isLooseShare(work)).toBe(true)
+    expect(getShareInfo(work).itemId).toBe('99')
+    expect(isPosterShare(work)).toBe(true)
+    expect(isPosterShare(live)).toBe(true)
+    expect(isPosterShare(poi)).toBe(true)
+    expect(isPosterShare(withCj({ im_dynamic_patch: { raw_data: '{}' } }, { msg_type: 4 }))).toBe(false)
+  })
+
+  it('renders inline_pic leftovers as images instead of raw JSON', () => {
+    const pic = withCj({
+      aweType: 0,
+      inline_pic: 'QQ',
+      check_pics: ['tos-x'],
+      create_type: 0,
+    }, { msg_type: 1, content: '{"inline_pic":"QQ"}' })
+    expect(isLooseImage(pic)).toBe(true)
+    expect(getImageSrc(pic)).toBe('data:image/webp;base64,QQ')
+    expect(shouldShow(pic)).toBe(true)
+    expect(isSystemMsg(pic)).toBe(false)
   })
 })
