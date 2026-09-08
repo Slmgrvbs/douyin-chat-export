@@ -1086,11 +1086,12 @@ watch(() => props.jumpToSeq, async (seq) => {
 .msg-item.group-start {
   margin-top: 14px;
 }
+/* Target only this row: forwarded dialogs contain another MessageList. */
 /* continuation messages hide the repeated avatar + name and sit tight */
-.msg-item.msg-grouped .msg-avatar {
+.msg-item.msg-grouped > .msg-avatar {
   visibility: hidden;
 }
-.msg-item.msg-grouped .msg-sender {
+.msg-item.msg-grouped > .msg-body > .msg-sender {
   display: none;
 }
 .msg-item.msg-highlight {
@@ -1144,7 +1145,7 @@ watch(() => props.jumpToSeq, async (seq) => {
   color: var(--text-muted);
   margin-bottom: 3px;
 }
-.msg-item.msg-self .msg-sender {
+.msg-item.msg-self > .msg-body > .msg-sender {
   text-align: right;
 }
 
@@ -1160,7 +1161,7 @@ watch(() => props.jumpToSeq, async (seq) => {
   box-shadow: var(--shadow-sm);
   border: 1px solid color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
-.msg-item.msg-self .msg-bubble {
+.msg-item.msg-self > .msg-body > .msg-bubble {
   background: var(--bg-message-self);
   color: var(--text-on-self);
   border: none;
@@ -1206,7 +1207,7 @@ watch(() => props.jumpToSeq, async (seq) => {
 .msg-share-card:hover {
   filter: brightness(1.1);
 }
-.msg-item.msg-self .msg-share-card {
+.msg-item.msg-self > .msg-body > .msg-share-card {
   background: var(--bg-message-self);
   border-top-left-radius: 10px;
   border-top-right-radius: 2px;
@@ -1313,12 +1314,12 @@ watch(() => props.jumpToSeq, async (seq) => {
   transform: scale(1.03);
   opacity: 0.78;
 }
-.msg-item.msg-self .msg-voice-play {
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-play {
   background: color-mix(in srgb, var(--text-on-self) 94%, transparent);
   color: var(--accent);
 }
-.msg-item.msg-self .msg-voice-play:hover:not(:disabled),
-.msg-item.msg-self .msg-voice-play.playing {
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-play:hover:not(:disabled),
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-play.playing {
   opacity: 0.8;
 }
 .msg-voice-play:disabled {
@@ -1360,7 +1361,7 @@ watch(() => props.jumpToSeq, async (seq) => {
 .msg-voice-wave i:nth-child(11) { height: 17px; }
 .msg-voice-wave i:nth-child(12) { height: 12px; }
 .msg-voice-wave i:nth-child(13) { height: 19px; }
-.msg-item.msg-self .msg-voice-wave i {
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-wave i {
   background: color-mix(in srgb, var(--text-on-self) 90%, transparent);
   opacity: 0.9;
 }
@@ -1387,14 +1388,14 @@ watch(() => props.jumpToSeq, async (seq) => {
   white-space: nowrap;
   text-align: right;
 }
-.msg-item.msg-self .msg-voice-dur {
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-dur {
   color: color-mix(in srgb, var(--text-on-self) 76%, transparent);
 }
 .msg-voice-divider {
   border-top: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
   margin: 8px 0 7px;
 }
-.msg-item.msg-self .msg-voice-divider {
+.msg-item.msg-self > .msg-body > .msg-voice-bubble .msg-voice-divider {
   border-top-color: color-mix(in srgb, var(--text-on-self) 25%, transparent);
 }
 .msg-voice-transcript {
@@ -1473,7 +1474,7 @@ watch(() => props.jumpToSeq, async (seq) => {
   color: var(--text-muted);
   margin-top: 3px;
 }
-.msg-item.msg-self .msg-time {
+.msg-item.msg-self > .msg-body > .msg-time {
   text-align: right;
 }
 .msg-recalled-tag {
