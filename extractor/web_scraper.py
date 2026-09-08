@@ -42,6 +42,13 @@ USER_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data",
 USER_INFO_API = "https://www.douyin.com/aweme/v1/web/im/user/info/"
 BATCH_USER_INFO = 20
 
+
+def _filter_conversations(conversations, name_filter):
+    """Panel selections are exact nicknames, including short names like 'n'."""
+    names = {part.strip() for part in name_filter.split(",") if part.strip()}
+    return [c for c in conversations
+            if c.get("nickname") in names or c.get("name") in names]
+
 # ── DOM Selectors (from discovery) ──────────────────────────────
 # Conversation list
 SEL_CONV_LIST = 'div[class*="conversationConversationListwrapper"]'
@@ -488,9 +495,7 @@ class WebChatScraper:
 
         if self.name_filter:
             # Support comma-separated multiple filters
-            filter_parts = [f.strip() for f in self.name_filter.split(",") if f.strip()]
-            filtered = [c for c in conversations
-                        if any(fp in c.get("nickname", "") or fp in c["name"] for fp in filter_parts)]
+            filtered = _filter_conversations(conversations, self.name_filter)
             print(f"[*] 过滤后: {len(filtered)} 个会话匹配 \"{self.name_filter}\"")
             if not filtered:
                 print(f"[-] 没有匹配的会话。全部会话名称:")
@@ -649,7 +654,7 @@ class WebChatScraper:
         """Find a conversation by name and click it.
 
         JS does the matching (with whitespace/nbsp normalization, so Windows
-        vs. Linux discrepancies don't break `in` checks), but the ACTUAL
+        vs. Linux discrepancies don't break exact checks), but the ACTUAL
         click uses Playwright's element handle — JS `.click()` only fires a
         `click` event, while React listens for `pointerdown`/`mousedown`,
         so a JS click was identified but wouldn't activate the conversation.
@@ -681,10 +686,7 @@ class WebChatScraper:
                     const fullText = normalize(titleEl.textContent);
                     debugNames.push(nickname || fullText.substring(0, 20));
 
-                    if (nickname === target ||
-                        (nickname && target.includes(nickname)) ||
-                        (nickname && nickname.includes(target)) ||
-                        fullText.includes(target)) {{
+                    if (target && (nickname === target || fullText === target)) {{
                         return {{index: i, text: nickname || fullText, names: debugNames}};
                     }}
                 }}
