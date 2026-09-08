@@ -16,8 +16,18 @@
 
     <template v-if="mode === 'text' && !query.trim()">
       <div class="search-shortcuts">
-        <button @click="setMode('date')"><span aria-hidden="true">▦</span>日期</button>
-        <button @click="setMode('media')"><span aria-hidden="true">▧</span>图片与视频</button>
+        <button @click="setMode('date')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2M8 18h2"/>
+          </svg>
+          日期
+        </button>
+        <button @click="setMode('media')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/>
+          </svg>
+          图片与视频
+        </button>
       </div>
       <p class="search-status">输入关键词开始搜索</p>
     </template>
@@ -224,7 +234,7 @@ function formatTime(ts) {
 .search-shortcuts { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border-color); }
 .search-shortcuts button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 9px 12px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
 .search-shortcuts button:hover { border-color: var(--accent); }
-.search-shortcuts span { color: var(--text-muted); }
+.search-shortcuts svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-secondary); }
 .search-scroll { overflow-y: auto; flex: 1; min-height: 0; }
 .search-status { padding: 28px 12px; text-align: center; font-size: 12px; color: var(--text-muted); }
 .search-status button { border: 0; background: none; color: var(--accent); cursor: pointer; }
