@@ -4,7 +4,7 @@ import {
   isJsonSticker, isJsonSystemMsg, isVoiceMsg, getVoiceDuration, getVoiceUrl,
   isVideoMsg, isJsonVideo, getVideoDuration, getInlinePic, getImageSrc, getEmojiSrc,
   getRefMsg, getRefContent, getRefNickname, extractServerMsgIds, isRecalled,
-  getWatchTogether, getProfileCard, isSystemMsg, duplicateSystemMessageIds,
+  getWatchTogether, getProfileCard, getForwardInfo, isSystemMsg, duplicateSystemMessageIds,
 } from './douyinMessage.js'
 
 // Build a message row. content_json is double-encoded inside raw_data, like the DB.
@@ -172,6 +172,12 @@ describe('issue 36 message cards and system perspective', () => {
     expect(renderSystemMsg(m, 'alice')).toBe('你领取了火星 查看')
     expect(renderSystemMsg(m, 'bob')).toBe('对方领取了火星 查看')
   })
+  it('does not share parsed content between distinct rows with the same ID', () => {
+    const a = withCj({ text: 'old' }, { msg_id: 'same' })
+    const b = withCj({ text: 'new' }, { msg_id: 'same' })
+    expect(getContentJson(a).text).toBe('old')
+    expect(getContentJson(b).text).toBe('new')
+  })
 })
 
 
@@ -184,6 +190,13 @@ describe('profile and forwarded cards', () => {
       expect(shouldShow(m)).toBe(true)
       expect(isSystemMsg(m)).toBe(false)
     }
+  })
+  it('does not confuse video shares with profiles or malformed summaries with arrays', () => {
+    expect(getProfileCard(withCj({ content_name: '作者', secUID: 'abc', itemId: '42' }))).toBeNull()
+    const m = withCj({ aweType: 13600, title: '聊天记录', list_content: {}, msg_ids: null }, { msg_type: 0 })
+    expect(getForwardInfo(m).preview).toEqual([])
+    expect(isSystemMsg(m)).toBe(false)
+    expect(shouldShow(m)).toBe(true)
   })
   it('pairs opposite notifications but retains repeated likes and different actors', () => {
     const make = (tips, fields = {}) => withCj({ aweType: 126, tips,

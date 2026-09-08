@@ -260,6 +260,23 @@ def get_message(msg_id: str):
     return msg
 
 
+@app.get("/api/messages/{msg_id}/forward")
+def get_forward_messages(msg_id: str):
+    from .forwarded import resolve_forward
+
+    msg = database.get_message(msg_id)
+    if not msg:
+        raise HTTPException(404, "消息不存在")
+    conn = database.get_db()
+    try:
+        result = resolve_forward(msg, conn)
+    finally:
+        conn.close()
+    if result is None:
+        raise HTTPException(422, "这不是合并转发消息")
+    return result
+
+
 @app.get("/api/users")
 def list_users():
     return database.get_all_users()

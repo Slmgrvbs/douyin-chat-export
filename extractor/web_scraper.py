@@ -24,6 +24,7 @@ if sys.platform == 'win32':
 from playwright.async_api import async_playwright
 
 from common import paths
+from extractor.forwarded import backfill_uploaded_forwards
 from extractor.models import (
     init_db, get_db, upsert_user, upsert_conversation, update_conversation_stats,
 )
@@ -2015,6 +2016,16 @@ class WebChatScraper:
             if not has_more:
                 print(f"  [*] 已到达聊天记录起点")
                 break
+
+        # 合并转发资源沿用当前网页登录态；失败不影响已保存的消息。
+        try:
+            forward_stats = await backfill_uploaded_forwards(
+                self.page, self._db_conn, conv_id, api_cursor,
+            )
+            if any(forward_stats.values()):
+                print(f"  [forward] 正文补全: {forward_stats}")
+        except Exception as exc:
+            print(f"  [!] 合并转发补全失败（消息已保存）: {type(exc).__name__}")
 
         # 5. 原生语音识别使用同一浏览器上下文的 cookies；放在消息落库之后，
         # 只处理本次实际新增的语音。历史语音由面板里的独立回填任务处理，

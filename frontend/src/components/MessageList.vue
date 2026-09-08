@@ -108,6 +108,7 @@
                   <small>用户名片 · 查看主页</small>
                 </div>
               </a>
+              <ForwardRecords v-else-if="getForwardInfo(msg)" :message="msg" :selfUid="selfUid" />
               <!-- 表情包 -->
               <div v-else-if="msg.msg_type === 2 && getEmojiSrc(msg)" class="msg-media">
                 <img :src="getEmojiSrc(msg)" :alt="msg.content" :loading="imgLoading" @click="openLightbox(getEmojiSrc(msg))" @error="onImgError" />
@@ -275,12 +276,14 @@ import { resolveAvatarUrl } from '@/lib/media'
 import MessageLightbox from './MessageLightbox.vue'
 import {
   clearCjCache, getContentJson, tryParseJson, tryParseShareContent, extractShareTitle,
-  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, isSystemMsg, duplicateSystemMessageIds,
+  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, getForwardInfo, isSystemMsg, duplicateSystemMessageIds,
   extractServerMsgIds, isVideoComment, isJsonShare, getShareInfo, getInlinePic,
   isVideoMsg, hasLocalVideo, isJsonVideo, getVideoPoster, getVideoDuration,
   getImageSrc, getEmojiSrc, isRecalled, isVoiceMsg, getVoiceUrl, getVoiceDuration,
   getRefMsg, getRefContent, getRefNickname,
 } from '@/lib/douyinMessage'
+
+import ForwardRecords from './ForwardRecords.vue'
 
 const props = defineProps({
   conversation: Object,
@@ -288,6 +291,7 @@ const props = defineProps({
   jumpToSeq: Number,
   // 截图模式：只加载 [startSeq, endSeq] 区间，隐藏交互 chrome，不绑定滚动
   staticRange: Object,
+  embeddedMessages: Array,
   selfUidOverride: String,
 })
 const emit = defineEmits(['jumped', 'staticLoaded'])
@@ -302,7 +306,7 @@ const listRef = ref(null)
 const senders = ref([])
 const selfUid = ref(props.selfUidOverride || localStorage.getItem('selfUid') || '')
 const showPicker = ref(false)
-const isStatic = computed(() => !!props.staticRange)
+const isStatic = computed(() => !!props.staticRange || !!props.embeddedMessages)
 const duplicateSystemIds = computed(() => duplicateSystemMessageIds(messages.value))
 const imgLoading = computed(() => (isStatic.value ? 'eager' : 'lazy'))
 
@@ -733,6 +737,7 @@ function onImgError(e) {
 }
 
 watch(() => props.conversation, (conv) => {
+  if (props.embeddedMessages) return
   if (conv) {
     messages.value = []
     clearCjCache()
@@ -747,6 +752,16 @@ watch(() => props.conversation, (conv) => {
     }
   }
 })
+
+watch(() => props.embeddedMessages, (items) => {
+  if (!items) return
+  messages.value = items
+  total.value = items.length
+  hasMore.value = false
+  loadUserInfoForMessages(items)
+}, { immediate: true })
+
+watch(() => props.selfUidOverride, (uid) => { selfUid.value = uid || '' })
 
 watch(() => props.jumpToSeq, async (seq) => {
   if (seq && props.conversation) {
@@ -922,7 +937,7 @@ watch(() => props.jumpToSeq, async (seq) => {
 }
 
 .msg-jump-fab {
-  position: fixed;
+  position: absolute;
   right: 32px;
   z-index: 100;
   padding: 8px 18px;

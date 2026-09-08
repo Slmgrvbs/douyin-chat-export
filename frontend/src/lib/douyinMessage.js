@@ -6,15 +6,15 @@
 // (often double-encoded) content_json), sender_uid, sender_name, timestamp,
 // media_local_path, media_url, ref_msg, voice_transcription }.
 
-// Cache parsed content_json by msg_id (cleared on conversation switch/jump).
-const cjCache = new Map()
+// Cache by row identity: the same server message may also appear in a forward.
+let cjCache = new WeakMap()
 
 export function clearCjCache() {
-  cjCache.clear()
+  cjCache = new WeakMap()
 }
 
 export function getContentJson(msg) {
-  if (cjCache.has(msg.msg_id)) return cjCache.get(msg.msg_id)
+  if (cjCache.has(msg)) return cjCache.get(msg)
   let cj = null
   try {
     if (msg.raw_data) {
@@ -24,7 +24,7 @@ export function getContentJson(msg) {
       }
     }
   } catch {}
-  cjCache.set(msg.msg_id, cj)
+  cjCache.set(msg, cj)
   return cj
 }
 
@@ -94,7 +94,7 @@ export function getWatchTogether(msg) {
 
 // Whether a message should render at all (empty system messages are hidden).
 export function shouldShow(msg) {
-  if (getProfileCard(msg) || isVoiceMsg(msg)) return true
+  if (getProfileCard(msg) || getForwardInfo(msg) || isVoiceMsg(msg)) return true
   if (getWatchTogether(msg)) return true       // 一起看视频卡片始终显示
   if (msg.msg_type === 0) return !!renderSystemMsg(msg)
   if (isJsonSystemMsg(msg)) return !!renderSystemMsg(msg)
@@ -363,8 +363,18 @@ export function getProfileCard(msg) {
   }
 }
 
+export function getForwardInfo(msg) {
+  const cj = getContentJson(msg) || tryParseJson(msg.content)
+  if (String(cj?.aweType) !== '13600') return null
+  return {
+    title: cj.title || '聊天记录',
+    preview: Array.isArray(cj.list_content) ? cj.list_content : [],
+    count: Array.isArray(cj.msg_ids) ? cj.msg_ids.length : null,
+  }
+}
+
 export function isSystemMsg(msg) {
-  if (getProfileCard(msg) || isVoiceMsg(msg)) return false
+  if (getProfileCard(msg) || getForwardInfo(msg) || isVoiceMsg(msg)) return false
   return msg.msg_type === 0 || isJsonSystemMsg(msg)
 }
 
