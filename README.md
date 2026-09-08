@@ -33,8 +33,10 @@
 - **语音转文字** — 新消息自动转写，也可一键补充历史语音，支持浏览、搜索和导出
 
 **浏览**（Vue 3 + FastAPI 内置界面）
-- 无限滚动、全文搜索、搜索结果一键跳转到原消息
+- 无限滚动、右侧面板内搜索当前会话，连续月份日历定位当天首条消息、图片／视频按日期分组展示，搜索结果支持「加载更多」及一键跳转
 - 消息分组、引用回复区块、图片点击放大、语音/视频在线播放与转写内容展示
+- 用户名片（头像、昵称、抖音号、粉丝数及主页链接），点赞／领取火星通知随「我」的选择切换人称
+- 合并转发聊天记录可展开查看：读取内嵌正文、本地原消息，或在抓取时通过网页登录态下载并解密远端记录；缺少正文时明确显示摘要及缺失数量（[格式与限制](docs/merged-forward-records.md)）
 - 5 套主题一键切换（暗色 / 微信绿 / 浅色 / 暖棕 / 紫夜），全中文界面
 
 **媒体本地化**
@@ -246,7 +248,7 @@ python3 login.py
 
 ```bash
 python3 extract.py                          # 全量采集所有会话
-python3 extract.py --filter "会话名称"        # 只采集指定会话
+python3 extract.py --filter "会话名称"        # 精确匹配昵称，多会话用英文逗号分隔
 python3 extract.py --filter "会话名称" --incremental   # 增量（只取新消息）
 python3 extract.py --transcribe-voices      # 只补充本地数据库中的历史语音转写
 ```
@@ -263,7 +265,14 @@ python3 export.py --filter "会话名称" --output data/export.jsonl
 
 未指定 `--output` 时，文件会自动命名为 `会话昵称_YYYYMMDDHHMMSS_export.jsonl`（或 `.json`）；显式指定输出路径时保留用户给出的文件名。
 
-导出内容：文本、表情、图片 URL、语音时长与转写文字、分享链接、引用/回复关系。也可在控制面板 **导出/导入** 分区一键操作。
+导出内容：文本、表情文字标签、图片、语音时长与转写文字、视频时长、分享链接、用户名片、商品卡片、引用/回复关系和合并转发正文。也可在控制面板 **导出/导入** 分区一键操作。
+
+- 图片优先内嵌本地已下载文件，缺失时使用缩略图或未加密的远端链接；无法取得可用图片时标记「图片未下载」。内嵌图片会增加导出文件体积。
+- 合并转发使用 ChatLab 的 FORWARD 类型，正文按发送者整理成文本；未取得的条目明确标为摘要，不会当作完整正文导出。
+- 普通回复和可匹配的视频引用写入 `replyToMessageId`。群聊保留群聊类型和成员名称。
+- 此格式面向聊天分析：表情、语音和视频不会打包成可播放的媒体附件。SQLite 备份也不包含 `data/media/`，完整备份需另外保存该目录。
+
+若采集时出现 `[media] emoji 失败 ... CERTIFICATE_VERIFY_FAILED`，这是媒体下载的证书校验失败，并非 ChatLab 文件写入失败。下载器使用系统证书库及公共 CA 证书；源码安装升级后请重新执行 `pip install -r requirements.txt`。使用自签证书的代理时，需要将其 CA 正确加入系统信任库，或通过 `SSL_CERT_FILE` 指向可信的 PEM 证书文件。Docker 容器需单独配置证书；不要关闭 TLS 校验。
 
 新采集的语音会自动转写。对已经保存的历史消息，可在控制面板 **采集** 分区点击「补充历史语音转写」，或执行 `python3 extract.py --transcribe-voices`。任务只处理尚未完成的语音，不会重新采集全部聊天记录；缺少的发送者信息会在需要时自动补充。
 
@@ -327,7 +336,8 @@ API token 只授权 **GET** 端点——删除操作和控制面板仍需面板�
 | `GET /api/conversations/{conv_id}/messages/range?start_seq=100&end_seq=200` | seq 闭区间消息 |
 | `GET /api/conversations/{conv_id}/stats/daily?tz=8` | 逐日消息量统计 |
 | `GET /api/conversations/{conv_id}/screenshot?...` | **消息区间渲染成聊天长图（PNG）**，见下 |
-| `GET /api/search?q=关键词` | 全文搜索 |
+| `GET /api/search?q=关键词` | 搜索；可加 `conv_id`、`start_time`、`end_time`、`media_type=image/video/media`、`page`、`page_size`，日期／媒体筛选时可省略 q |
+| `GET /api/messages/{msg_id}/forward` | 合并转发详情；返回 `items`、`total`、`available`、`missing`、`complete` |
 | `GET /api/users/{uid}` | 用户信息（昵称 / 头像） |
 
 **聊天长图渲染**：服务端用无头浏览器打开内置浏览界面的截图模式，整段消息渲染为一张 PNG
