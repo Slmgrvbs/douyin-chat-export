@@ -7,3 +7,6 @@ httpx
 apscheduler
 cryptography
 pillow-heif
+
+truststore>=0.10
+certifi

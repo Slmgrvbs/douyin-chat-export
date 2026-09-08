@@ -24,6 +24,7 @@ if sys.platform == 'win32':
 from playwright.async_api import async_playwright
 
 from common import paths
+from common.tls import client_context
 from extractor.forwarded import backfill_uploaded_forwards
 from extractor.models import (
     init_db, get_db, upsert_user, upsert_conversation, update_conversation_stats,
@@ -124,7 +125,7 @@ def _fetch(url, timeout=20):
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.douyin.com/",
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=client_context()) as resp:
         return resp.read()
 
 
@@ -785,7 +786,7 @@ class WebChatScraper:
             try:
                 import urllib.request
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=15) as resp:
+                with urllib.request.urlopen(req, timeout=15, context=client_context()) as resp:
                     data = resp.read()
                 if len(data) > 100:
                     with open(local_path, "wb") as f:
