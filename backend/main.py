@@ -322,6 +322,8 @@ app.include_router(screenshot_router)
 
 @app.on_event("startup")
 async def startup():
+    from common.db import init_db
+    init_db()
     config.ensure_api_token()
     await restore_schedule_on_startup()
 

@@ -45,6 +45,9 @@
       </button>
       <div class="msg-list" :class="{ 'msg-list-static': isStatic }" ref="listRef">
         <div v-if="loading" class="msg-loading">加载中...</div>
+        <div v-else-if="loadError" role="alert" class="msg-loading">
+          {{ loadError }} <button @click="fetchMessages(conversation.conv_id)">重试</button>
+        </div>
         <div v-if="hasMore && !loading && atLatest" class="msg-load-more" @click="loadMore">
           ⬆ 加载更早消息
         </div>
@@ -261,7 +264,7 @@
         <div v-if="hasMore && !loading && !atLatest" class="msg-load-more" @click="loadMore">
           ⬇ 加载更新消息
         </div>
-        <div v-if="messages.length === 0 && !loading" class="msg-no-data">
+        <div v-if="messages.length === 0 && !loading && !loadError" class="msg-no-data">
           暂无消息
         </div>
       </div>
@@ -508,7 +511,9 @@ function selectSystemContent(e) {
 const highlightMsgId = ref(null)
 
 // Lightbox state (the overlay + ESC handling live in MessageLightbox)
+const loadError = ref('')
 const referenceError = ref('')
+let messageRequestId = 0
 const lightboxSrc = ref(null)
 function openLightbox(src) {
   if (src) lightboxSrc.value = src
@@ -594,7 +599,9 @@ async function fetchSenders(convId) {
 }
 
 async function fetchMessages(convId, beforeSeq = null, afterSeq = null) {
+  const requestId = ++messageRequestId
   loading.value = true
+  loadError.value = ''
   let url = `/api/conversations/${convId}/messages?page_size=100`
   if (beforeSeq !== null) url += `&before_seq=${beforeSeq}`
   if (afterSeq !== null) url += `&after_seq=${afterSeq}`
@@ -603,7 +610,11 @@ async function fetchMessages(convId, beforeSeq = null, afterSeq = null) {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     data = await res.json()
+    if (requestId !== messageRequestId || props.conversation?.conv_id !== convId) return
+    if (!Array.isArray(data.items)) throw new Error('消息响应格式错误')
   } catch (e) {
+    if (requestId !== messageRequestId || props.conversation?.conv_id !== convId) return
+    loadError.value = `消息加载失败（${e.message}），请重试；持续失败请查看服务端日志`
     // Don't leave the spinner (and scroll lock) stuck forever on a failed load.
     loading.value = false
     scrollLocked = false
@@ -773,6 +784,8 @@ function onImgError(e) {
 
 watch(() => props.conversation, (conv) => {
   referenceError.value = ''
+  loadError.value = ''
+  messageRequestId++
   if (props.embeddedMessages) return
   if (conv) {
     messages.value = []
@@ -787,7 +800,7 @@ watch(() => props.conversation, (conv) => {
       fetchMessages(conv.conv_id)
     }
   }
-})
+}, { immediate: true })
 
 watch(() => props.embeddedMessages, (items) => {
   if (!items) return
