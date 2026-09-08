@@ -190,7 +190,7 @@ def list_messages(
     if not conv:
         raise HTTPException(404, "会话不存在")
     items, total = database.get_messages(conv_id, page_size=page_size, before_seq=before_seq, after_seq=after_seq)
-    return {"items": items, "total": total}
+    return {"items": items, "total": total, **database.get_message_page_bounds(conv_id, items)}
 
 
 @app.get("/api/conversations/{conv_id}/messages/by-date")
