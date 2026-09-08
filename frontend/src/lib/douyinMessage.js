@@ -94,6 +94,7 @@ export function getWatchTogether(msg) {
 
 // Whether a message should render at all (empty system messages are hidden).
 export function shouldShow(msg) {
+  if (getProfileCard(msg) || isVoiceMsg(msg)) return true
   if (getWatchTogether(msg)) return true       // 一起看视频卡片始终显示
   if (msg.msg_type === 0) return !!renderSystemMsg(msg)
   if (isJsonSystemMsg(msg)) return !!renderSystemMsg(msg)
@@ -336,3 +337,24 @@ export function getRefNickname(ref) {
   if (!ref) return ''
   return ref.nickname || ''
 }
+
+// User-homepage cards can be stored as text, share, or other by older scrapers.
+export function getProfileCard(msg) {
+  const cj = getContentJson(msg) || tryParseJson(msg.content)
+  if (!cj || !cj.name || !(cj.secUID || cj.sec_uid || (cj.uid && cj.source === 'others_homepage'))) return null
+  const id = cj.secUID || cj.sec_uid || String(cj.uid)
+  const avatar = cj.avatar_thumb || cj.avatar || cj.avatar_url || cj.cover_url
+  return {
+    name: String(cj.name),
+    avatar: typeof avatar === 'string' ? (/^https?:\/\//.test(avatar) ? avatar : '') : avatar?.url_list?.[0] || '',
+    description: cj.desc || '',
+    followers: cj.follower_count ?? null,
+    url: `https://www.douyin.com/user/${encodeURIComponent(id)}`,
+  }
+}
+
+export function isSystemMsg(msg) {
+  if (getProfileCard(msg) || isVoiceMsg(msg)) return false
+  return msg.msg_type === 0 || isJsonSystemMsg(msg)
+}
+

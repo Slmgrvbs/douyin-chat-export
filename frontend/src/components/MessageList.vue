@@ -53,14 +53,14 @@
           :data-msgid="msg.msg_id"
           :class="{
             'msg-self': isSelf(msg),
-            'msg-system': (msg.msg_type === 0 && !isVoiceMsg(msg)) || isJsonSystemMsg(msg),
+            'msg-system': isSystemMsg(msg),
             'msg-highlight': highlightMsgId === msg.msg_id,
             'group-start': isGroupStart(index),
             'msg-grouped': !isGroupStart(index),
           }"
         >
           <!-- 系统消息居中显示 -->
-          <template v-if="(msg.msg_type === 0 && !isVoiceMsg(msg)) || isJsonSystemMsg(msg)">
+          <template v-if="isSystemMsg(msg)">
             <div class="msg-system-block">
               <!-- 一起看视频邀请卡片 (aweType=9000) -->
               <div v-if="getWatchTogether(msg)" class="msg-watch-card">
@@ -100,8 +100,16 @@
                 <span v-if="getRefNickname(getRefMsg(msg))" class="msg-ref-name">{{ getRefNickname(getRefMsg(msg)) }}：</span>
                 <span class="msg-ref-content">{{ getRefContent(getRefMsg(msg)) }}</span>
               </div>
+              <a v-if="getProfileCard(msg)" class="msg-profile-card" :href="getProfileCard(msg).url" target="_blank" rel="noopener noreferrer">
+                <img v-if="getProfileCard(msg).avatar" :src="getProfileCard(msg).avatar" alt="用户头像" :loading="imgLoading" @error="onImgError" />
+                <div><strong>{{ getProfileCard(msg).name }}</strong>
+                  <div v-if="getProfileCard(msg).description">抖音号：{{ getProfileCard(msg).description }}</div>
+                  <div v-if="getProfileCard(msg).followers !== null">粉丝：{{ getProfileCard(msg).followers }}</div>
+                  <small>用户名片 · 查看主页</small>
+                </div>
+              </a>
               <!-- 表情包 -->
-              <div v-if="msg.msg_type === 2 && getEmojiSrc(msg)" class="msg-media">
+              <div v-else-if="msg.msg_type === 2 && getEmojiSrc(msg)" class="msg-media">
                 <img :src="getEmojiSrc(msg)" :alt="msg.content" :loading="imgLoading" @click="openLightbox(getEmojiSrc(msg))" @error="onImgError" />
               </div>
               <!-- 图片/视频：优先本地原文件，回退到 inline_pic 缩略图 -->
@@ -267,7 +275,7 @@ import { resolveAvatarUrl } from '@/lib/media'
 import MessageLightbox from './MessageLightbox.vue'
 import {
   clearCjCache, getContentJson, tryParseJson, tryParseShareContent, extractShareTitle,
-  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether,
+  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, isSystemMsg,
   extractServerMsgIds, isVideoComment, isJsonShare, getShareInfo, getInlinePic,
   isVideoMsg, hasLocalVideo, isJsonVideo, getVideoPoster, getVideoDuration,
   getImageSrc, getEmojiSrc, isRecalled, isVoiceMsg, getVoiceUrl, getVoiceDuration,
@@ -347,7 +355,7 @@ function isSelf(msg) {
 }
 
 function _isSystem(msg) {
-  return (msg.msg_type === 0 && !isVoiceMsg(msg)) || isJsonSystemMsg(msg)
+  return isSystemMsg(msg)
 }
 
 // A message starts a new visual group unless it continues the previous
@@ -762,6 +770,11 @@ watch(() => props.jumpToSeq, async (seq) => {
 </script>
 
 <style scoped>
+.msg-profile-card { display: flex; align-items: center; gap: 12px; width: 280px; max-width: 100%; padding: 14px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius); text-decoration: none; }
+.msg-profile-card img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.msg-profile-card strong { font-size: 15px; }
+.msg-profile-card div div, .msg-profile-card small { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+
 .msg-panel {
   display: flex;
   flex-direction: column;

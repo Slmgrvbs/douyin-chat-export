@@ -4,7 +4,7 @@ import {
   isJsonSticker, isJsonSystemMsg, isVoiceMsg, getVoiceDuration, getVoiceUrl,
   isVideoMsg, isJsonVideo, getVideoDuration, getInlinePic, getImageSrc, getEmojiSrc,
   getRefMsg, getRefContent, getRefNickname, extractServerMsgIds, isRecalled,
-  getWatchTogether,
+  getWatchTogether, getProfileCard, isSystemMsg,
 } from './douyinMessage.js'
 
 // Build a message row. content_json is double-encoded inside raw_data, like the DB.
@@ -154,5 +154,22 @@ describe('misc', () => {
   it('isRecalled reads is_recalled', () => {
     expect(isRecalled(withCj({ is_recalled: true }))).toBe(true)
     expect(isRecalled(msg({ content: 'hi' }))).toBe(false)
+  })
+})
+
+// issue #36: names/cards, actor perspective and merged-record detection.
+describe('issue 36 message cards and system perspective', () => {
+})
+
+
+describe('profile and forwarded cards', () => {
+  it('renders old profile rows of every stored type using the complete JSON', () => {
+    for (const type of [0, 1, 4]) {
+      const m = withCj({ name: '名片', secUID: 'MS4w-test', desc: 'douyin123', follower_count: 0,
+        avatar: { url_list: ['https://example.com/avatar.jpg'] } }, { msg_type: type, content: '{"name":' })
+      expect(getProfileCard(m)).toEqual({ name: '名片', avatar: 'https://example.com/avatar.jpg', description: 'douyin123', followers: 0, url: 'https://www.douyin.com/user/MS4w-test' })
+      expect(shouldShow(m)).toBe(true)
+      expect(isSystemMsg(m)).toBe(false)
+    }
   })
 })
