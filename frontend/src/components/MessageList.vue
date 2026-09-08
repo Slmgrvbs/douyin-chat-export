@@ -48,7 +48,7 @@
         </div>
         <template v-for="(msg, index) in messages" :key="msg.msg_id">
         <div
-          v-if="shouldShow(msg)"
+          v-if="shouldShow(msg) && !duplicateSystemIds.has(msg.msg_id)"
           class="msg-item"
           :data-msgid="msg.msg_id"
           :class="{
@@ -70,7 +70,7 @@
                   <div v-if="getWatchTogether(msg).subtitle" class="msg-watch-sub">{{ getWatchTogether(msg).subtitle }}</div>
                 </div>
               </div>
-              <div v-else class="msg-system-text" @contextmenu="selectSystemContent">{{ renderSystemMsg(msg) }}</div>
+              <div v-else class="msg-system-text" @contextmenu="selectSystemContent">{{ renderSystemMsg(msg, selfUid) }}</div>
               <!-- 引用的分享视频卡片 -->
               <div
                 v-if="sysRefCache[msg.msg_id]"
@@ -275,7 +275,7 @@ import { resolveAvatarUrl } from '@/lib/media'
 import MessageLightbox from './MessageLightbox.vue'
 import {
   clearCjCache, getContentJson, tryParseJson, tryParseShareContent, extractShareTitle,
-  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, isSystemMsg,
+  isJsonSystemMsg, isJsonSticker, getStickerUrl, shouldShow, renderSystemMsg, getWatchTogether, getProfileCard, isSystemMsg, duplicateSystemMessageIds,
   extractServerMsgIds, isVideoComment, isJsonShare, getShareInfo, getInlinePic,
   isVideoMsg, hasLocalVideo, isJsonVideo, getVideoPoster, getVideoDuration,
   getImageSrc, getEmojiSrc, isRecalled, isVoiceMsg, getVoiceUrl, getVoiceDuration,
@@ -303,6 +303,7 @@ const senders = ref([])
 const selfUid = ref(props.selfUidOverride || localStorage.getItem('selfUid') || '')
 const showPicker = ref(false)
 const isStatic = computed(() => !!props.staticRange)
+const duplicateSystemIds = computed(() => duplicateSystemMessageIds(messages.value))
 const imgLoading = computed(() => (isStatic.value ? 'eager' : 'lazy'))
 
 // 用户信息缓存 { uid: { nickname, avatar_url, unique_id } }

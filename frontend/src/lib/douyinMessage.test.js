@@ -4,7 +4,7 @@ import {
   isJsonSticker, isJsonSystemMsg, isVoiceMsg, getVoiceDuration, getVoiceUrl,
   isVideoMsg, isJsonVideo, getVideoDuration, getInlinePic, getImageSrc, getEmojiSrc,
   getRefMsg, getRefContent, getRefNickname, extractServerMsgIds, isRecalled,
-  getWatchTogether, getProfileCard, isSystemMsg,
+  getWatchTogether, getProfileCard, isSystemMsg, duplicateSystemMessageIds,
 } from './douyinMessage.js'
 
 // Build a message row. content_json is double-encoded inside raw_data, like the DB.
@@ -159,6 +159,19 @@ describe('misc', () => {
 
 // issue #36: names/cards, actor perspective and merged-record detection.
 describe('issue 36 message cards and system perspective', () => {
+  it('changes like pronouns without altering the referenced video name', () => {
+    const m = withCj({ aweType: 126, tips: '{{1}}赞了你分享的 {{2}}', template: [
+      { key: 1, name: '对方' }, { key: 2, name: '你和对方的旅行 $&' },
+    ] }, { sender_uid: 'alice' })
+    expect(renderSystemMsg(m, 'alice')).toBe('你赞了对方分享的 你和对方的旅行 $&')
+    expect(renderSystemMsg(m, 'bob')).toBe('对方赞了你分享的 你和对方的旅行 $&')
+    expect(renderSystemMsg(m)).toBe('对方赞了你分享的 你和对方的旅行 $&')
+  })
+  it('changes spark claims in both directions', () => {
+    const m = withCj({ aweType: 287, tips: '对方领取了火星 {{0}}', template: [{ key: 0, name: '查看' }] }, { sender_uid: 'alice' })
+    expect(renderSystemMsg(m, 'alice')).toBe('你领取了火星 查看')
+    expect(renderSystemMsg(m, 'bob')).toBe('对方领取了火星 查看')
+  })
 })
 
 
@@ -171,5 +184,16 @@ describe('profile and forwarded cards', () => {
       expect(shouldShow(m)).toBe(true)
       expect(isSystemMsg(m)).toBe(false)
     }
+  })
+  it('pairs opposite notifications but retains repeated likes and different actors', () => {
+    const make = (tips, fields = {}) => withCj({ aweType: 126, tips,
+      template: [{ key: 2, name: '视频', extra: { server_message_id: '7600000000000000012' } }],
+    }, { sender_uid: 'alice', conv_id: 'c1', timestamp: 100, ...fields })
+    const a = make('你赞了{{1}}分享的 {{2}}')
+    const b = make('{{1}}赞了你分享的 {{2}}', { timestamp: 115 })
+    const c = make('你赞了{{1}}分享的 {{2}}', { timestamp: 116 })
+    expect([...duplicateSystemMessageIds([a, b, c])]).toEqual([b.msg_id])
+    expect(duplicateSystemMessageIds([a, make('{{1}}赞了你分享的 {{2}}', { sender_uid: 'bob' })]).size).toBe(0)
+    expect(duplicateSystemMessageIds([a, make('{{1}}赞了你分享的 {{2}}', { timestamp: 131 })]).size).toBe(0)
   })
 })

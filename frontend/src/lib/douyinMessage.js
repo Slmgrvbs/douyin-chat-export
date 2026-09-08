@@ -102,7 +102,7 @@ export function shouldShow(msg) {
 }
 
 // System message: render the template (prefer content_json — content may be truncated).
-export function renderSystemMsg(msg) {
+export function renderSystemMsg(msg, selfUid = '') {
   const cj = getContentJson(msg)
   const source = cj || tryParseJson(msg.content)
   if (!source) {
@@ -110,9 +110,19 @@ export function renderSystemMsg(msg) {
   }
   if (source.tips) {
     let text = source.tips
-    if (source.template) {
+    // These events carry the actor's UID, even when Douyin supplies a
+    // recipient-oriented template. Change only template pronouns, never names
+    // or the referenced video's title.
+    if (selfUid && msg.sender_uid && String(source.aweType) === '126' && /赞了/.test(text)) {
+      text = String(msg.sender_uid) === String(selfUid)
+        ? '你赞了对方分享的 {{2}}' : '对方赞了你分享的 {{2}}'
+    } else if (selfUid && msg.sender_uid && /^(你|对方)领取了火星/.test(text)) {
+      text = text.replace(/^(你|对方)/, String(msg.sender_uid) === String(selfUid) ? '你' : '对方')
+    }
+    if (Array.isArray(source.template)) {
       for (const t of source.template) {
-        text = text.replace(`{{${t.key}}}`, t.name || '')
+        if (!t || t.key === undefined) continue
+        text = text.replaceAll(`{{${t.key}}}`, () => t.name || '')
       }
     }
     return text
@@ -129,7 +139,7 @@ export function extractServerMsgIds(msg) {
   const ids = []
   try {
     const raw = typeof msg.raw_data === 'string' ? msg.raw_data : JSON.stringify(msg.raw_data)
-    const re = /server_message_id\\?"?\s*:\s*(\d{15,})/g
+    const re = /server_message_id\\?"?\s*:\s*\\?"?(\d{15,})/g
     let match
     while ((match = re.exec(raw)) !== null) {
       ids.push(match[1])
@@ -358,3 +368,30 @@ export function isSystemMsg(msg) {
   return msg.msg_type === 0 || isJsonSystemMsg(msg)
 }
 
+// Douyin may return both sender/recipient notifications for one event. Pair
+// only opposite templates for the same actor/reference within 30 seconds (observed mirror delays
+// reach 15 seconds);
+// repeated likes with the same template remain distinct events.
+export function duplicateSystemMessageIds(messages) {
+  const pending = new Map()
+  const hidden = new Set()
+  for (const msg of messages) {
+    const cj = getContentJson(msg) || tryParseJson(msg.content)
+    if (!cj?.tips || !msg.sender_uid || !msg.timestamp) continue
+    const like = String(cj.aweType) === '126' && cj.tips.includes('赞了')
+    const spark = /^(你|对方)领取了火星/.test(cj.tips)
+    if (!like && !spark) continue
+    const refs = extractServerMsgIds(msg).join(',')
+    if (like && !refs) continue
+    const key = JSON.stringify([msg.conv_id, msg.sender_uid, like ? 'like' : 'spark', refs,
+      spark ? cj.template : null])
+    const prev = pending.get(key)
+    if (prev && prev.tips !== cj.tips && Math.abs(msg.timestamp - prev.timestamp) <= 30) {
+      hidden.add(msg.msg_id)
+      pending.delete(key)
+    } else {
+      pending.set(key, { timestamp: msg.timestamp, tips: cj.tips })
+    }
+  }
+  return hidden
+}
