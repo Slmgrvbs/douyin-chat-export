@@ -16,6 +16,8 @@
         </button>
       </div>
 
+      <div v-if="referenceError" role="status" class="msg-loading" @click="referenceError = ''">{{ referenceError }}</div>
+
       <!-- UID 选择弹窗 -->
       <div v-if="showPicker" class="picker-overlay" @click.self="showPicker = false">
         <div class="picker-dialog">
@@ -75,7 +77,7 @@
               <div
                 v-if="sysRefCache[msg.msg_id]"
                 class="msg-system-ref"
-                @click="openVideoById(sysRefCache[msg.msg_id].itemId)"
+                @click="openSystemReference(msg)"
               >
                 <img
                   v-if="sysRefCache[msg.msg_id].cover"
@@ -239,7 +241,7 @@
                 </div>
               </div>
               <!-- 评论引用视频（aweType=700，文本+关联视频） -->
-              <div v-else-if="isVideoComment(msg)" class="msg-share-card" @click="openShare(msg)">
+              <div v-else-if="isVideoComment(msg)" class="msg-share-card" @click="openVideoReference(msg)">
                 <div class="msg-share-comment" v-html="highlightText(msg.content)"></div>
                 <div class="msg-share-card-inner msg-share-card-ref">
                   <span class="msg-share-card-ref-icon">▶</span>
@@ -443,7 +445,7 @@ async function loadSysRefs(msgList) {
         const refMsg = await res.json()
         const info = getShareInfo(refMsg)
         if (info.title || info.cover) {
-          sysRefCache[msg.msg_id] = info
+          sysRefCache[msg.msg_id] = { ...info, serverId: smid }
           break
         }
       } catch {}
@@ -451,8 +453,27 @@ async function loadSysRefs(msgList) {
   }
 }
 
-function openVideoById(itemId) {
-  if (itemId) window.open(`https://www.douyin.com/video/${itemId}`, '_blank')
+function openSystemReference(msg) {
+  const target = sysRefCache[msg.msg_id]
+  if (props.embeddedMessages) {
+    if (target?.itemId) window.open(`https://www.douyin.com/video/${target.itemId}`, '_blank')
+  } else if (target?.serverId) jumpToRefMsg({ server_id: target.serverId })
+}
+
+async function openVideoReference(msg) {
+  if (props.embeddedMessages) return openShare(msg)
+  const ref = getRefMsg(msg)
+  if (ref?.server_id) return jumpToRefMsg(ref)
+  const convId = props.conversation?.conv_id
+  try {
+    const res = await fetch(`/api/messages/${encodeURIComponent(msg.msg_id)}/referenced-video`)
+    if (!res.ok) throw new Error()
+    const target = await res.json()
+    if (props.conversation?.conv_id !== convId) return
+    return jumpToRefMsg({ server_id: target.msg_id.replace(/^srv_/, '') })
+  } catch {
+    if (props.conversation?.conv_id === convId) referenceError.value = '引用的消息未归档，无法定位'
+  }
 }
 
 // 右键消息体 → 全选其内容（让浏览器原生右键菜单的"复制"直接生效）
@@ -487,6 +508,7 @@ function selectSystemContent(e) {
 const highlightMsgId = ref(null)
 
 // Lightbox state (the overlay + ESC handling live in MessageLightbox)
+const referenceError = ref('')
 const lightboxSrc = ref(null)
 function openLightbox(src) {
   if (src) lightboxSrc.value = src
@@ -494,7 +516,11 @@ function openLightbox(src) {
 
 async function jumpToRefMsg(ref) {
   if (!ref || !ref.server_id || !props.conversation) return
-  const msgId = `srv_${ref.server_id}`
+  referenceError.value = ''
+  const convId = props.conversation.conv_id
+  const canonicalId = `srv_${ref.server_id}`
+  const embedded = props.embeddedMessages?.find(m => m.msg_id === canonicalId || m.msg_id.endsWith('/' + canonicalId))
+  const msgId = embedded?.msg_id || canonicalId
   // 锁定滚动，防止无限加载干扰
   scrollLocked = true
   try {
@@ -506,18 +532,24 @@ async function jumpToRefMsg(ref) {
       setTimeout(() => { highlightMsgId.value = null }, 2000)
       return
     }
+    if (isStatic.value) {
+      referenceError.value = '引用的消息不在当前记录中'
+      return
+    }
     // 需要加载目标消息附近的消息
     const res = await fetch(`/api/messages/${msgId}`)
-    if (!res.ok) return
+    if (!res.ok) throw new Error()
     const msg = await res.json()
-    if (!msg.seq) return
+    if (props.conversation?.conv_id !== convId) return
+    if (msg.conv_id !== convId || !msg.seq) throw new Error()
     const targetSeq = Math.max(0, msg.seq - 50)
-    messages.value = []
-    clearCjCache()
     loading.value = true
     const url = `/api/conversations/${props.conversation.conv_id}/messages?page_size=100&after_seq=${targetSeq}`
     const res2 = await fetch(url)
+    if (!res2.ok) throw new Error()
     const data = await res2.json()
+    if (props.conversation?.conv_id !== convId) return
+    clearCjCache()
     loading.value = false
     messages.value = data.items
     total.value = data.total
@@ -532,7 +564,10 @@ async function jumpToRefMsg(ref) {
       highlightMsgId.value = msgId
       setTimeout(() => { highlightMsgId.value = null }, 2000)
     }
-  } catch {} finally {
+  } catch {
+    referenceError.value = '引用的消息未归档或加载失败，无法定位'
+  } finally {
+    loading.value = false
     setTimeout(() => { scrollLocked = false }, 300)
   }
 }
@@ -737,6 +772,7 @@ function onImgError(e) {
 }
 
 watch(() => props.conversation, (conv) => {
+  referenceError.value = ''
   if (props.embeddedMessages) return
   if (conv) {
     messages.value = []

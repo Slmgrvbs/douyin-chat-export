@@ -11,6 +11,37 @@ def get_db():
     return connect()
 
 
+def find_referenced_video(msg_id):
+    """A related_share_video contains a video ID, not a message ID.
+
+    Locate the nearest preceding original share in the same conversation.
+    """
+    from .forwarded import content_json
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM messages WHERE msg_id=?", (msg_id,)).fetchone()
+        if not row:
+            return None
+        source = dict(row)
+        video = content_json(source).get("related_share_video") or {}
+        item_id = str(video.get("itemId") or "")
+        if not item_id.isdigit():
+            return None
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE conv_id=? AND seq<? "
+            "AND raw_data LIKE ? ORDER BY seq DESC",
+            (source["conv_id"], source["seq"], f"%{item_id}%"),
+        )
+        for candidate in rows:
+            message = dict(candidate)
+            cj = content_json(message)
+            if str(cj.get("itemId") or "") == item_id and not cj.get("related_share_video"):
+                return message
+        return None
+    finally:
+        conn.close()
+
+
 def get_conversations(search=None, page=1, page_size=50):
     conn = get_db()
     offset = (page - 1) * page_size

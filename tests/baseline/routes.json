@@ -12,6 +12,7 @@
  "GET /api/conversations/{conv_id}/stats/daily",
  "GET /api/messages/{msg_id}",
  "GET /api/messages/{msg_id}/forward",
+ "GET /api/messages/{msg_id}/referenced-video",
  "GET /api/search",
  "GET /api/stats",
  "GET /api/token",

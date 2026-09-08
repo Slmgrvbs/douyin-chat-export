@@ -290,6 +290,14 @@ def get_forward_messages(msg_id: str):
     return result
 
 
+@app.get("/api/messages/{msg_id}/referenced-video")
+def get_referenced_video(msg_id: str):
+    message = database.find_referenced_video(msg_id)
+    if not message:
+        raise HTTPException(404, "引用的消息未归档")
+    return message
+
+
 @app.get("/api/users")
 def list_users():
     return database.get_all_users()
