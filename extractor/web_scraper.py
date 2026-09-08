@@ -2058,21 +2058,33 @@ class WebChatScraper:
 
         # 7. 归一化 seq
         print(f"  [*] 归一化消息序号 (按服务端排序)...")
-        rows = self._db_conn.execute(
-            "SELECT msg_id FROM messages WHERE conv_id = ? ORDER BY seq ASC",
-            (conv_id,),
-        ).fetchall()
-        for new_seq, row in enumerate(rows, 1):
-            self._db_conn.execute(
-                "UPDATE messages SET seq = ? WHERE msg_id = ?",
-                (new_seq, row[0]),
-            )
-        self._db_conn.commit()
-        print(f"  [*] 已归一化 {len(rows)} 条消息的序号")
+        count = self._normalize_message_order(conv_id)
+        print(f"  [*] 已归一化 {count} 条消息的序号")
 
         elapsed = time.time() - start_time
         print(f"  [*] API 获取完成: {total_fetched} 条消息, {total_saved} 条新增, 耗时 {elapsed:.1f}s")
         return total_saved
+
+    def _normalize_message_order(self, conv_id):
+        # seq is a reader position after normalization, not a durable sort key.
+        # Rebuild from archived timestamps and original server order so new
+        # microsecond keys and existing compact positions never get mixed.
+        rows = self._db_conn.execute(
+            """SELECT msg_id FROM messages WHERE conv_id = ?
+               ORDER BY timestamp ASC,
+                 CASE WHEN json_valid(raw_data) THEN COALESCE(
+                   CAST(json_extract(raw_data, '$.created_at_us') AS INTEGER),
+                   CAST(json_extract(raw_data, '$.order_high') AS INTEGER) * 4294967296
+                     + (CAST(json_extract(raw_data, '$.order_low') AS INTEGER) & 4294967295),
+                   seq) ELSE seq END ASC,
+                 msg_id ASC""", (conv_id,),
+        ).fetchall()
+        self._db_conn.executemany(
+            "UPDATE messages SET seq = ? WHERE msg_id = ?",
+            ((seq, row[0]) for seq, row in enumerate(rows, 1)),
+        )
+        self._db_conn.commit()
+        return len(rows)
 
     async def _transcribe_voice_messages(self, conv_id, conv_short_id, message_ids=None):
         """识别指定消息中的语音；不传 IDs 时用于显式历史回填。"""
