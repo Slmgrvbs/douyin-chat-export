@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import ConversationList from './components/ConversationList.vue'
 import MessageList from './components/MessageList.vue'
 import SearchBar from './components/SearchBar.vue'
@@ -11,7 +11,11 @@ const isScreenshotMode = location.pathname === '/screenshot'
 const activeConversation = ref(null)
 const searchHighlight = ref('')
 const jumpToSeq = ref(null)
-const sidebarOpen = ref(false)
+const mobileLayout = window.matchMedia('(max-width: 768px)')
+const sidebarOpen = ref(!mobileLayout.matches)
+const syncSidebarLayout = () => { sidebarOpen.value = !mobileLayout.matches }
+mobileLayout.addEventListener('change', syncSidebarLayout)
+onUnmounted(() => mobileLayout.removeEventListener('change', syncSidebarLayout))
 const searchOpen = ref(false)
 
 // Auth
@@ -95,7 +99,7 @@ function applyTheme(id) {
 function selectConversation(conv) {
   activeConversation.value = conv
   searchHighlight.value = ''
-  sidebarOpen.value = false
+  if (mobileLayout.matches) sidebarOpen.value = false
 }
 
 function onConversationDeleted(convId) {
@@ -144,16 +148,19 @@ function navigateToMessage(item) {
   <!-- Main app -->
   <div v-else class="app-layout">
     <div class="sidebar-overlay" :class="{ visible: sidebarOpen }" @click="sidebarOpen = false"></div>
-    <div class="app-sidebar" :class="{ open: sidebarOpen }">
+    <div id="conversation-sidebar" class="app-sidebar" :class="{ open: sidebarOpen }" :inert="!sidebarOpen">
       <ConversationList
         :activeId="activeConversation?.conv_id"
         @select="selectConversation"
         @deleted="onConversationDeleted"
+        @collapse="sidebarOpen = false"
       />
     </div>
     <div class="app-main">
       <div class="app-toolbar">
-        <button class="sidebar-toggle" @click="sidebarOpen = !sidebarOpen">☰</button>
+        <button class="sidebar-toggle" :aria-label="sidebarOpen ? '收起会话列表' : '展开会话列表'" :title="sidebarOpen ? '收起会话列表' : '展开会话列表'" :aria-expanded="sidebarOpen" aria-controls="conversation-sidebar" @click="sidebarOpen = !sidebarOpen">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+        </button>
         <div class="app-title">抖音聊天记录</div>
         <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">⌕ 查找聊天记录</button>
         <div class="theme-switcher">
@@ -338,7 +345,7 @@ function navigateToMessage(item) {
 }
 
 .sidebar-toggle {
-  display: none;
+  display: flex;
   background: none;
   border: none;
   color: var(--text-primary);
@@ -354,6 +361,10 @@ function navigateToMessage(item) {
 
 .sidebar-overlay {
   display: none;
+}
+
+@media (min-width: 769px) {
+  .app-sidebar:not(.open) { display: none; }
 }
 
 @media (max-width: 768px) {
