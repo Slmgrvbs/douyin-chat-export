@@ -166,7 +166,6 @@ function navigateToMessage(item) {
         :activeId="activeConversation?.conv_id"
         @select="selectConversation"
         @deleted="onConversationDeleted"
-        @collapse="sidebarOpen = false"
       />
     </div>
     <div class="app-main">

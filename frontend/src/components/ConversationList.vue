@@ -3,9 +3,6 @@
     <div class="conv-header">
       <h2>会话</h2>
       <a class="panel-link" href="/panel">管理面板</a>
-      <button class="collapse-conversations" aria-label="收起会话列表" title="收起会话列表" @click="$emit('collapse')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16m7-11-3 3 3 3"/></svg>
-      </button>
     </div>
     <div class="conv-search">
       <input
@@ -69,7 +66,7 @@ import { resolveAvatarUrl } from '@/lib/media'
 const props = defineProps({
   activeId: String,
 })
-const emit = defineEmits(['select', 'deleted', 'collapse'])
+const emit = defineEmits(['select', 'deleted'])
 
 const conversations = ref([])
 const searchQuery = ref('')
@@ -156,8 +153,6 @@ onMounted(() => {
 }
 .panel-link { margin-right: auto; margin-left: 10px; padding: 4px 7px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; text-decoration: none; color: var(--text-secondary); }
 .panel-link:hover { color: var(--accent); border-color: var(--accent); }
-.collapse-conversations { display: flex; align-items: center; margin-left: 8px; padding: 3px; border: 0; border-radius: 4px; background: transparent; color: var(--text-secondary); cursor: pointer; }
-.collapse-conversations:hover { color: var(--accent); background: var(--bg-tertiary); }
 
 
 .conv-search {
