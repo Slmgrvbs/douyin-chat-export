@@ -3,9 +3,8 @@
     <div class="conv-header">
       <h2>会话</h2>
       <a class="panel-link" href="/panel">管理面板</a>
-      <span class="conv-count">{{ total }}</span>
       <button class="collapse-conversations" aria-label="收起会话列表" title="收起会话列表" @click="$emit('collapse')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M17 6l-6 6 6 6"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16m7-11-3 3 3 3"/></svg>
       </button>
     </div>
     <div class="conv-search">
@@ -73,7 +72,6 @@ const props = defineProps({
 const emit = defineEmits(['select', 'deleted', 'collapse'])
 
 const conversations = ref([])
-const total = ref(0)
 const searchQuery = ref('')
 const pendingDelete = ref(null)
 const deleting = ref(false)
@@ -89,7 +87,6 @@ async function fetchConversations(search = '') {
   const res = await fetch(`/api/conversations?${params}`)
   const data = await res.json()
   conversations.value = data.items
-  total.value = data.total
 }
 
 function onSearch() {
@@ -123,7 +120,6 @@ async function confirmDelete() {
       return
     }
     conversations.value = conversations.value.filter(c => c.conv_id !== conv.conv_id)
-    total.value = Math.max(0, total.value - 1)
     emit('deleted', conv.conv_id)
     pendingDelete.value = null
   } catch (e) {
@@ -162,13 +158,7 @@ onMounted(() => {
 .panel-link:hover { color: var(--accent); border-color: var(--accent); }
 .collapse-conversations { display: flex; align-items: center; margin-left: 8px; padding: 3px; border: 0; border-radius: 4px; background: transparent; color: var(--text-secondary); cursor: pointer; }
 .collapse-conversations:hover { color: var(--accent); background: var(--bg-tertiary); }
-.conv-count {
-  background: var(--accent);
-  color: white;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
+
 
 .conv-search {
   padding: 8px 12px;
