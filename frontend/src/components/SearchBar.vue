@@ -224,7 +224,7 @@ function formatTime(ts) {
 </script>
 
 <style scoped>
-.search-panel { width: 320px; flex: 0 0 320px; min-height: 0; display: flex; flex-direction: column; background: var(--bg-secondary); border-left: 1px solid var(--border-color); color: var(--text-primary); }
+.search-panel { position: absolute; inset: 0 0 0 auto; z-index: 120; box-shadow: -8px 0 28px #0003; width: min(320px, 100%); min-height: 0; display: flex; flex-direction: column; background: var(--bg-secondary); border-left: 1px solid var(--border-color); color: var(--text-primary); }
 .search-header { display: flex; align-items: center; gap: 8px; padding: 12px; min-height: 58px; border-bottom: 1px solid var(--border-color); }
 .search-header strong { font-size: 13px; font-weight: 500; }
 .close-button { margin-left: auto; }

@@ -184,11 +184,8 @@ function navigateToMessage(item) {
 </template>
 
 <style scoped>
-.search-reveal-enter-active, .search-reveal-leave-active { transition: width .24s ease, flex-basis .24s ease, opacity .24s ease, transform .24s ease; overflow: hidden; }
-.search-reveal-enter-from, .search-reveal-leave-to { width: 0; flex-basis: 0; opacity: 0; transform: translateX(24px); }
-@media (max-width: 800px) {
-  .search-reveal-enter-from, .search-reveal-leave-to { width: min(340px, 100%); transform: translateX(100%); }
-}
+.search-reveal-enter-active, .search-reveal-leave-active { transition: opacity .24s ease, transform .24s ease; overflow: hidden; }
+.search-reveal-enter-from, .search-reveal-leave-to { opacity: 0; transform: translateX(100%); }
 @media (prefers-reduced-motion: reduce) {
   .search-reveal-enter-active, .search-reveal-leave-active { transition: none; }
 }
