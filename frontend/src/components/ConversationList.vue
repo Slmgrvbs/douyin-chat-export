@@ -2,6 +2,7 @@
   <div class="conv-list">
     <div class="conv-header">
       <h2>会话</h2>
+      <a class="panel-link" href="/panel">管理面板</a>
       <span class="conv-count">{{ total }}</span>
     </div>
     <div class="conv-search">
@@ -154,6 +155,8 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 600;
 }
+.panel-link { margin-right: auto; margin-left: 10px; padding: 4px 7px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; text-decoration: none; color: var(--text-secondary); }
+.panel-link:hover { color: var(--accent); border-color: var(--accent); }
 .conv-count {
   background: var(--accent);
   color: white;
