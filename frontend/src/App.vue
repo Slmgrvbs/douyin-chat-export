@@ -175,13 +175,24 @@ function navigateToMessage(item) {
           :jumpToSeq="jumpToSeq"
           @jumped="jumpToSeq = null"
         />
+        <Transition name="search-reveal">
         <SearchBar v-if="searchOpen && activeConversation" :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="searchOpen = false" />
+        </Transition>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.search-reveal-enter-active, .search-reveal-leave-active { transition: width .24s ease, flex-basis .24s ease, opacity .24s ease, transform .24s ease; overflow: hidden; }
+.search-reveal-enter-from, .search-reveal-leave-to { width: 0; flex-basis: 0; opacity: 0; transform: translateX(24px); }
+@media (max-width: 800px) {
+  .search-reveal-enter-from, .search-reveal-leave-to { width: min(340px, 100%); transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-reveal-enter-active, .search-reveal-leave-active { transition: none; }
+}
+
 .reader-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .reader-layout > .msg-panel { min-width: 0; }
 .search-toggle { padding: 5px 10px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }

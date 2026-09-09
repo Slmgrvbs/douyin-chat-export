@@ -9,8 +9,19 @@ const dialog = ref(null)
 const detail = ref(null)
 const loading = ref(false)
 const error = ref('')
-async function open() {
+async function open(event) {
+  const source = event?.currentTarget?.closest('.forward-card')?.getBoundingClientRect()
+  const opening = !dialog.value.open
   dialog.value.showModal()
+  if (opening && source && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const target = dialog.value.getBoundingClientRect()
+    const x = source.left + source.width / 2 - target.left - target.width / 2
+    const y = source.top + source.height / 2 - target.top - target.height / 2
+    dialog.value.animate([
+      { transform: `translate(${x}px, ${y}px) scale(${source.width / target.width}, ${source.height / target.height})`, opacity: 0 },
+      { transform: 'none', opacity: 1 },
+    ], { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' })
+  }
   if (detail.value || loading.value) return
   loading.value = true
   error.value = ''
@@ -48,6 +59,8 @@ async function open() {
 .forward-card > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; font-size: 12px; color: var(--text-secondary); }
 .forward-card small { width: 100%; padding-top: 8px; border-top: 1px solid var(--border-color); color: var(--text-muted); }
 .forward-dialog { margin: auto; width: min(760px, 94vw); max-height: 85vh; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); color: var(--text-primary); }
+.forward-dialog[open] { display: flex; flex-direction: column; height: min(760px, 85vh); }
+.forward-dialog > .msg-panel { min-height: 0; }
 .forward-dialog::backdrop { background: #0008; }
 .forward-dialog header { display: flex; justify-content: space-between; gap: 12px; padding: 16px; position: sticky; top: 0; background: var(--bg-secondary); z-index: 1; }
 .forward-dialog header button { cursor: pointer; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 10px; }
