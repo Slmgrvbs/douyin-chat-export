@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import ConversationList from './components/ConversationList.vue'
 import MessageList from './components/MessageList.vue'
 import SearchBar from './components/SearchBar.vue'
@@ -17,6 +17,19 @@ const syncSidebarLayout = () => { sidebarOpen.value = !mobileLayout.matches }
 mobileLayout.addEventListener('change', syncSidebarLayout)
 onUnmounted(() => mobileLayout.removeEventListener('change', syncSidebarLayout))
 const searchOpen = ref(false)
+const readerLayout = ref(null)
+async function setSearchOpen(open) {
+  const list = readerLayout.value?.querySelector('.msg-list')
+  const bottom = list && list.scrollHeight - list.scrollTop - list.clientHeight < 2
+  const top = list?.getBoundingClientRect().top || 0
+  const anchor = list && [...list.querySelectorAll(':scope > .msg-item')].find(row => row.getBoundingClientRect().bottom > top)
+  const offset = anchor?.getBoundingClientRect().top
+  searchOpen.value = open
+  await nextTick()
+  if (!list?.isConnected) return
+  if (bottom) list.scrollTop = list.scrollHeight - list.clientHeight
+  else if (anchor?.isConnected) list.scrollTop += anchor.getBoundingClientRect().top - offset
+}
 
 // Auth
 const authChecking = ref(true)
@@ -162,7 +175,7 @@ function navigateToMessage(item) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
         </button>
         <div class="app-title">抖音聊天记录</div>
-        <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">⌕ 查找聊天记录</button>
+        <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" @click="setSearchOpen(!searchOpen)">⌕ 查找聊天记录</button>
         <div class="theme-switcher">
           <button
             v-for="t in themes"
@@ -175,16 +188,18 @@ function navigateToMessage(item) {
           />
         </div>
       </div>
-      <div class="reader-layout">
+      <div ref="readerLayout" class="reader-layout">
         <MessageList
           :conversation="activeConversation"
           :searchHighlight="searchHighlight"
           :jumpToSeq="jumpToSeq"
           @jumped="jumpToSeq = null"
         />
-        <Transition name="search-reveal">
-        <SearchBar v-if="searchOpen && activeConversation" :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="searchOpen = false" />
-        </Transition>
+        <div v-if="searchOpen && activeConversation" class="search-slot">
+          <Transition appear name="search-reveal">
+            <SearchBar :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="setSearchOpen(false)" />
+          </Transition>
+        </div>
       </div>
     </div>
   </div>
@@ -199,6 +214,10 @@ function navigateToMessage(item) {
 
 .reader-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .reader-layout > .msg-panel { min-width: 0; }
+.search-slot { flex: 0 0 320px; width: 320px; min-height: 0; overflow: hidden; }
+@media (max-width: 800px) {
+  .search-slot { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 120; box-shadow: -8px 0 28px #0003; }
+}
 .search-toggle { padding: 5px 10px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .search-toggle:hover:not(:disabled), .search-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .search-toggle:disabled { opacity: .4; cursor: default; }

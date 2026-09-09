@@ -224,7 +224,7 @@ function formatTime(ts) {
 </script>
 
 <style scoped>
-.search-panel { position: absolute; inset: 0 0 0 auto; z-index: 120; box-shadow: -8px 0 28px #0003; width: min(320px, 100%); min-height: 0; display: flex; flex-direction: column; background: var(--bg-secondary); border-left: 1px solid var(--border-color); color: var(--text-primary); }
+.search-panel { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg-secondary); border-left: 1px solid var(--border-color); color: var(--text-primary); }
 .search-header { display: flex; align-items: center; gap: 8px; padding: 12px; min-height: 58px; border-bottom: 1px solid var(--border-color); }
 .search-header strong { font-size: 13px; font-weight: 500; }
 .close-button { margin-left: auto; }
@@ -268,7 +268,4 @@ function formatTime(ts) {
 .calendar-days button { aspect-ratio: 1; border-radius: 50%; border: 0; background: var(--bg-tertiary); color: var(--text-primary); font-size: 11px; cursor: pointer; }
 .calendar-days button:disabled { background: transparent; color: var(--text-muted); opacity: .4; cursor: default; }
 .calendar-days button.selected, .calendar-days button:hover:not(:disabled) { background: var(--accent); color: #fff; }
-@media (max-width: 800px) {
-  .search-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 120; box-shadow: -8px 0 28px #0003; }
-}
 </style>
