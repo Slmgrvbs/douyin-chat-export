@@ -65,3 +65,15 @@ def test_calendar_date_jump_can_request_just_first_message(temp_db, monkeypatch)
     assert len(response.json()['items']) == 1
     assert response.json()['items'][0]['msg_id'] == 'm00'
     assert client.get('/api/conversations/c1/messages/by-date', params={'date': '1970-01-01', 'limit': 0}).status_code == 422
+
+
+def test_search_complete_share_title_and_comment(temp_db):
+    import json
+    conn = database.get_db()
+    insert_conversation(conn, 'full-share', '会话')
+    insert_message(conn, 'share-full', 'full-share', 1, content='{truncated', msg_type=4,
+                   raw_data=json.dumps({'content_json': json.dumps({'content_title': '完整标题', 'comment': '完整评论'})}))
+    conn.commit(); conn.close()
+    for keyword in ['完整标题', '完整评论']:
+        rows, total = database.search_messages(keyword, conv_id='full-share')
+        assert total == 1 and rows[0]['msg_id'] == 'share-full'

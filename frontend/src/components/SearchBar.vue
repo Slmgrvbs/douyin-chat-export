@@ -87,6 +87,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { highlightText } from '@/lib/highlight'
 import { getImageSrc, getVideoPoster, getVideoDuration, isVideoMsg, isJsonVideo, getProfileCard, getForwardInfo } from '@/lib/douyinMessage'
+import { sharePreview } from '@/lib/sharePreview'
 import { calendarMonths, dateBounds, groupMediaByDate } from '@/lib/search'
 
 const props = defineProps({ convId: String, convName: String })
@@ -209,6 +210,8 @@ function isVideo(item) { return isVideoMsg(item) || isJsonVideo(item) }
 function preview(item) {
   if (getProfileCard(item)) return `[用户名片] ${getProfileCard(item).name}`
   if (getForwardInfo(item)) return `[聊天记录] ${getForwardInfo(item).title}`
+  const share = sharePreview(item)
+  if (share) return share
   if (isVideo(item)) return '[视频]'
   if (item.msg_type === 3) return '[图片]'
   return item.voice_transcription || item.content || '[消息]'

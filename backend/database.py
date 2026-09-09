@@ -188,11 +188,18 @@ def search_messages(query="", page=1, page_size=50, *, conv_id=None,
 
     Time bounds are [start_time, end_time), so adjacent dates never overlap.
     """
+    raw = "CASE WHEN json_valid(m.raw_data) THEN m.raw_data ELSE '{}' END"
+    content = f"json_extract({raw}, '$.content_json')"
+    cj = f"CASE WHEN json_valid({content}) THEN {content} ELSE '{{}}' END"
     clauses, params = [], []
     if query:
         pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        clauses.append("(m.content LIKE ? ESCAPE '\\' OR vt.text_result LIKE ? ESCAPE '\\')")
-        params.extend([pattern, pattern])
+        fields = ["m.content", "vt.text_result", *[
+            f"json_extract({cj}, '$.{key}')"
+            for key in ("content_title", "aweme_title", "comment", "text")
+        ]]
+        clauses.append("(" + " OR ".join(f"{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
+        params.extend([pattern] * len(fields))
     if conv_id is not None:
         clauses.append("m.conv_id = ?")
         params.append(conv_id)
@@ -204,9 +211,6 @@ def search_messages(query="", page=1, page_size=50, *, conv_id=None,
         params.append(end_time)
     # Legacy video rows were stored as images/text. Inspect the preserved JSON
     # as well as the local file; malformed/truncated JSON must not break search.
-    raw = "CASE WHEN json_valid(m.raw_data) THEN m.raw_data ELSE '{}' END"
-    content = f"json_extract({raw}, '$.content_json')"
-    cj = f"CASE WHEN json_valid({content}) THEN {content} ELSE '{{}}' END"
     video = f"""(m.msg_type = 5 OR COALESCE(lower(m.media_local_path) LIKE '%.mp4', 0)
                 OR (m.msg_type IN (1, 3) AND json_extract({cj}, '$.video.vid') IS NOT NULL))"""
     if media_type == "image":
