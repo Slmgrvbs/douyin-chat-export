@@ -77,6 +77,12 @@ def resolve_forward(message, conn, *, ancestors=(), budget=None):
     previews = {str(b.get("msgid")): b for b in _array(cj.get("list_content"))}
     ids = [str(d.get("msg_id")) for d in descriptors] or list(inline) or list(previews)
     descriptor_map = {str(d.get("msg_id")): d for d in descriptors}
+    # Preview nicknames identify senders, not just the first three rows.
+    sender_names = {}
+    for sid, preview in previews.items():
+        uid = str(inline.get(sid, {}).get("sender") or descriptor_map.get(sid, {}).get("uid") or "")
+        if uid and preview.get("nick_name"):
+            sender_names[uid] = preview["nick_name"]
     result = {"title": cj.get("title") or "聊天记录", "items": [], "total": len(ids),
               "available": 0, "missing": len(ids), "complete": False}
     if len(ancestors) >= 5 or budget[0] <= 0:
@@ -96,7 +102,7 @@ def resolve_forward(message, conn, *, ancestors=(), budget=None):
                 row = None
         if row is None:
             row = {"msg_id": f"{message['msg_id']}/missing_{sid}", "msg_type": 1,
-                   "sender_name": preview.get("nick_name") or "", "sender_uid": "",
+                   "sender_name": preview.get("nick_name") or "", "sender_uid": str(descriptor_map.get(sid, {}).get("uid") or ""),
                    "content": preview.get("text") or "[消息详情未采集]", "timestamp": 0,
                    "detail_missing": True}
         else:
@@ -112,6 +118,9 @@ def resolve_forward(message, conn, *, ancestors=(), budget=None):
             if nested is not None:
                 row["forward_detail"] = nested
         result["items"].append(row)
+    for row in result["items"]:
+        if not row.get("sender_name"):
+            row["sender_name"] = sender_names.get(row.get("sender_uid"), "")
     result["missing"] = result["total"] - result["available"]
     result["complete"] = bool(ids) and result["missing"] == 0
     return result

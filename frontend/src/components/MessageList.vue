@@ -396,7 +396,7 @@ function displayName(msg) {
   if (msg.sender_name && msg.sender_name !== '__self__') return msg.sender_name
   // 群聊里回退成会话名 = 把每个不认识的成员都显示成群名，不同的人会糊成同一个。
   // 单聊没这个问题（会话名就是对方昵称）。
-  if (isGroupConv.value) {
+  if (props.embeddedMessages || isGroupConv.value) {
     return msg.sender_uid ? `用户${msg.sender_uid.slice(-6)}` : '群成员'
   }
   return props.conversation?.name || '对方'

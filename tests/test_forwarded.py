@@ -76,3 +76,15 @@ def test_forward_http_contract(temp_db, monkeypatch):
     response = client.get('/api/messages/merged/forward')
     assert response.status_code == 200
     assert response.json()['missing'] == 1
+
+
+def test_preview_names_follow_sender_beyond_first_three(temp_db):
+    conn = database.get_db()
+    ids = [101, 102, 103, 104, 105]
+    message = forward({'msg_ids': [{'msg_id': i, 'uid': 20 if i % 2 else 30} for i in ids],
+        'list_content': [{'msgid': 101, 'nick_name': '乙'}, {'msgid': 102, 'nick_name': '丙'}],
+        'inline_content': [{'server_message_id': i, 'sender': 20 if i % 2 else 30,
+                            'content': json.dumps({'text': '正文'})} for i in ids]})
+    detail = resolve_forward(message, conn)
+    assert [m['sender_name'] for m in detail['items']] == ['乙', '丙', '乙', '丙', '乙']
+    conn.close()
