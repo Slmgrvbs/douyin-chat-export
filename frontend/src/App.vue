@@ -195,9 +195,7 @@ function navigateToMessage(item) {
           @jumped="jumpToSeq = null"
         />
         <div v-if="searchOpen && activeConversation" class="search-slot">
-          <Transition appear name="search-reveal">
-            <SearchBar :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="setSearchOpen(false)" />
-          </Transition>
+          <SearchBar :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="setSearchOpen(false)" />
         </div>
       </div>
     </div>
@@ -205,10 +203,15 @@ function navigateToMessage(item) {
 </template>
 
 <style scoped>
-.search-reveal-enter-active, .search-reveal-leave-active { transition: opacity .24s ease, transform .24s ease; overflow: hidden; }
-.search-reveal-enter-from, .search-reveal-leave-to { opacity: 0; transform: translateX(100%); }
+/* Allocate the panel once; animate only its contents, without reflowing chat. */
+.search-slot > .search-panel { --panel-offset: 12px; animation: panel-enter .16s cubic-bezier(.2, 0, .2, 1); }
+.app-sidebar.open > :deep(.conv-list) { --panel-offset: -12px; animation: panel-enter .16s cubic-bezier(.2, 0, .2, 1); }
+@keyframes panel-enter {
+  from { opacity: .75; transform: translateX(var(--panel-offset)); }
+  to { opacity: 1; transform: translateX(0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .search-reveal-enter-active, .search-reveal-leave-active { transition: none; }
+  .search-slot > .search-panel, .app-sidebar.open > :deep(.conv-list) { animation: none; }
 }
 
 .reader-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
@@ -397,7 +400,6 @@ function navigateToMessage(item) {
     height: 100vh;
     z-index: 1000;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
     width: 280px;
   }
 
@@ -413,7 +415,6 @@ function navigateToMessage(item) {
     z-index: 999;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s ease;
   }
 
   .sidebar-overlay.visible {
