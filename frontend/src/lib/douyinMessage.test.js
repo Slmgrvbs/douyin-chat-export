@@ -210,3 +210,23 @@ describe('profile and forwarded cards', () => {
     expect(duplicateSystemMessageIds([a, make('{{1}}赞了你分享的 {{2}}', { timestamp: 131 })]).size).toBe(0)
   })
 })
+
+
+describe('dynamic and ordinary share layouts', () => {
+  it.each(['[分享图文]', '[分享动图]', '[分享视频]'])('reads dynamic title, author and precise ID for %s', prefix => {
+    const msg = withCj({ aweType: 11054, item_id: '7681898524564602297',
+      im_dynamic_patch: { raw_data: JSON.stringify({
+        top_bottom_top: { content: '完整作品标题' },
+        top_bottom_content_right: { content: '作者' }, top: { content: 'https://example.com/cover.jpg' },
+      }) } }, { content: prefix + '备用标题', msg_type: 4 })
+    expect(getShareInfo(msg)).toMatchObject({ title: '完整作品标题', author: '作者', itemId: '7681898524564602297', productUrl: '' })
+  })
+  it('falls back to a prefixed title and nested ID for incomplete layouts', () => {
+    expect(getShareInfo(withCj({ aweme_info: { item_id: '123' }, im_dynamic_patch: { raw_data: '{}' } },
+      { content: '[分享动图] 备用标题' }))).toMatchObject({ title: '备用标题', itemId: '123' })
+  })
+  it('preserves top-level fields when the dynamic layout is malformed', () => {
+    expect(getShareInfo(withCj({ item_id: '456', content_name: '作者', content_title: '标题',
+      im_dynamic_patch: { raw_data: '{bad' } }))).toMatchObject({ title: '标题', author: '作者', itemId: '456' })
+  })
+})

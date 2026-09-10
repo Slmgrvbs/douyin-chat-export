@@ -37,7 +37,7 @@ export function tryParseShareContent(content) {
   if (!content || !content.startsWith('{')) return null
   try {
     const obj = JSON.parse(content)
-    if (obj.content_title || obj.cover_url) return obj
+    if (obj.content_title || obj.cover_url || obj.im_dynamic_patch || obj.item_id || obj.itemId) return obj
   } catch {}
   return null
 }
@@ -45,7 +45,7 @@ export function tryParseShareContent(content) {
 export function extractShareTitle(content) {
   if (!content) return ''
   // "分享[商品]: 商品名称" / "分享[视频]: 标题" / "[分享视频]标题"
-  const m = content.match(/^(?:分享\[.+?\][:：]\s*|^\[分享视频\])(.+)/s)
+  const m = content.match(/^(?:分享\[.+?\][:：]\s*|\[分享.+?\])(.+)/s)
   return m ? m[1].trim() : ''
 }
 
@@ -168,21 +168,18 @@ export function getShareInfo(msg) {
   const source = cj || tryParseShareContent(msg.content)
   if (!source) return { title: '', author: '', cover: '', itemId: '', productUrl: '', comment: '', commentUser: '' }
 
-  // 商品卡片 (aweType=11029): 从 im_dynamic_patch.raw_data 提取
-  const patch = source.im_dynamic_patch
-  if (patch?.raw_data) {
-    try {
-      const pr = typeof patch.raw_data === 'string' ? JSON.parse(patch.raw_data) : patch.raw_data
-      const title = pr.content_top?.content || extractShareTitle(msg.content) || ''
-      const cover = pr.top?.content || ''
-      let productUrl = ''
-      const actions = pr.whole_card?.action_info
-      if (actions?.[0]?.params?.schema) {
-        const m = actions[0].params.schema.match(/commodity_id=(\d+)/)
-        if (m) productUrl = 'https://www.douyin.com/product/' + m[1]
-      }
-      return { title, author: '', cover, itemId: '', productUrl, comment: '', commentUser: '', commentImg: '' }
-    } catch {}
+  // Dynamic layouts are also used by video/photo/live-photo shares.
+  let layout = {}
+  try {
+    const patch = source.im_dynamic_patch?.raw_data
+    const parsed = typeof patch === 'string' ? JSON.parse(patch) : patch
+    if (parsed && typeof parsed === 'object') layout = parsed
+  } catch { /* Keep usable top-level fields if the layout is malformed. */ }
+  const imageUrl = value => typeof value === 'string' ? value : value?.url_list?.[0] || ''
+  let productUrl = ''
+  for (const action of Array.isArray(layout.whole_card?.action_info) ? layout.whole_card.action_info : []) {
+    const match = String(action?.params?.schema || '').match(/commodity_id=(\d+)/)
+    if (match) { productUrl = 'https://www.douyin.com/product/' + match[1]; break }
   }
 
   // aweType=10500: 引用视频评论 (comment 字段); aweType=700: (text 字段)
@@ -191,11 +188,11 @@ export function getShareInfo(msg) {
   const commentImg = source.comment_url?.url_list?.[0] || ''
   const relatedVideo = source.related_share_video || {}
   return {
-    title: source.content_title || source.aweme_title || extractShareTitle(msg.content) || '',
-    author: source.content_name || '',
-    cover: source.cover_url?.url_list?.[0] || '',
-    itemId: source.itemId || relatedVideo.itemId || '',
-    productUrl: '',
+    title: layout.top_bottom_top?.content || layout.content_top?.content || source.content_title || source.aweme_title || extractShareTitle(msg.content) || '',
+    author: layout.top_bottom_content_right?.content || source.content_name || '',
+    cover: imageUrl(layout.top?.content) || imageUrl(source.cover_url) || imageUrl(source.aweme_info?.cover_url),
+    itemId: String(source.itemId || source.item_id || source.aweme_info?.item_id || relatedVideo.itemId || ''),
+    productUrl,
     comment,
     commentUser,
     commentImg,
