@@ -191,13 +191,16 @@ def search_messages(query="", page=1, page_size=50, *, conv_id=None,
     raw = "CASE WHEN json_valid(m.raw_data) THEN m.raw_data ELSE '{}' END"
     content = f"json_extract({raw}, '$.content_json')"
     cj = f"CASE WHEN json_valid({content}) THEN {content} ELSE '{{}}' END"
+    patch = f"json_extract({cj}, '$.im_dynamic_patch.raw_data')"
+    layout = f"CASE WHEN json_valid({patch}) THEN {patch} ELSE '{{}}' END"
     clauses, params = [], []
     if query:
         pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         fields = ["m.content", "vt.text_result", *[
             f"json_extract({cj}, '$.{key}')"
             for key in ("content_title", "aweme_title", "comment", "text")
-        ]]
+        ], *[f"json_extract({layout}, '$.{key}.content')"
+             for key in ("top_bottom_top", "content_top")]]
         clauses.append("(" + " OR ".join(f"{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
         params.extend([pattern] * len(fields))
     if conv_id is not None:

@@ -77,3 +77,15 @@ def test_search_complete_share_title_and_comment(temp_db):
     for keyword in ['完整标题', '完整评论']:
         rows, total = database.search_messages(keyword, conv_id='full-share')
         assert total == 1 and rows[0]['msg_id'] == 'share-full'
+
+
+def test_search_dynamic_share_layout_title(temp_db):
+    import json
+    conn = database.get_db()
+    insert_conversation(conn, 'dynamic-share', '会话')
+    for index, layout in enumerate([json.dumps({'top_bottom_top': {'content': '动态完整标题'}}), '{bad']):
+        insert_message(conn, f'dynamic-{index}', 'dynamic-share', index + 1, content='[分享]', msg_type=4,
+                       raw_data=json.dumps({'content_json': json.dumps({'im_dynamic_patch': {'raw_data': layout}})}))
+    conn.commit(); conn.close()
+    rows, total = database.search_messages('动态完整标题', conv_id='dynamic-share')
+    assert total == 1 and rows[0]['msg_id'] == 'dynamic-0'

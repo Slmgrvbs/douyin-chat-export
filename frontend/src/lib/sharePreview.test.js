@@ -16,3 +16,11 @@ describe('readable shared-message search results', () => {
     expect(sharePreview({ msg_type: 1, content: '普通消息' })).toBeNull()
   })
 })
+
+it('reads dynamic titles and bracketed share hints without mislabeling photos', () => {
+  for (const type of ['图文', '动图', '视频']) {
+    const msg = row({ aweType: 11054, push_detail: `[分享${type}]`, item_id: '123',
+      im_dynamic_patch: { raw_data: JSON.stringify({ top_bottom_top: { content: '完整标题' } }) } })
+    expect(sharePreview(msg)).toBe(`[分享${type}] 完整标题`)
+  }
+})
