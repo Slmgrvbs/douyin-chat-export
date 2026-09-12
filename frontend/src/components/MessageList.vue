@@ -642,6 +642,8 @@ async function fetchMessages(convId, beforeSeq = null, afterSeq = null) {
   } else if (afterSeq !== null) {
     // 向下加载更新的消息（从最早端向下加载更多）
     messages.value = [...messages.value, ...data.items]
+    // 日期/搜索跳转也走此分支，不能沿用跳转前的“已到最新”状态。
+    atLatest.value = false
     // 如果没有更多新消息了，说明已到达最新
     if (data.items.length === 0 || messages.value.length >= data.total) {
       atLatest.value = true
