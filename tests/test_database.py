@@ -65,6 +65,28 @@ def test_page_size_limit(temp_db):
     assert total == 5
 
 
+def test_message_page_bounds_track_both_sides(temp_db):
+    import backend.database as database
+    _seed(temp_db)
+
+    middle, _ = database.get_messages("c1", page_size=2, after_seq=1)
+    assert [m["seq"] for m in middle] == [2, 3]
+    assert database.get_message_page_bounds("c1", middle) == {
+        "has_older": True,
+        "has_newer": True,
+    }
+
+    latest, _ = database.get_messages("c1", page_size=2)
+    assert database.get_message_page_bounds("c1", latest) == {
+        "has_older": True,
+        "has_newer": False,
+    }
+    assert database.get_message_page_bounds("c1", []) == {
+        "has_older": False,
+        "has_newer": False,
+    }
+
+
 def test_search_joins_conv_and_sender_name(temp_db):
     import backend.database as database
     conn = database.get_db()

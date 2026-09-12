@@ -119,6 +119,22 @@ def get_messages(conv_id, page_size=100, before_seq=None, after_seq=None):
     return [dict(r) for r in rows], total
 
 
+def get_message_page_bounds(conv_id, items):
+    """Return whether messages exist on either side of a loaded page."""
+    seqs = [int(item["seq"]) for item in items if item.get("seq") is not None]
+    if not seqs:
+        return {"has_older": False, "has_newer": False}
+    conn = get_db()
+    row = conn.execute(
+        """SELECT
+               EXISTS(SELECT 1 FROM messages WHERE conv_id = ? AND seq < ?) AS has_older,
+               EXISTS(SELECT 1 FROM messages WHERE conv_id = ? AND seq > ?) AS has_newer""",
+        (conv_id, min(seqs), conv_id, max(seqs)),
+    ).fetchone()
+    conn.close()
+    return {"has_older": bool(row[0]), "has_newer": bool(row[1])}
+
+
 
 def get_messages_by_date(conv_id, date_str, tz_hours=8, limit=5000):
     """某个自然日（按 tz_hours 时区界定）内的全部消息，按 seq 升序。

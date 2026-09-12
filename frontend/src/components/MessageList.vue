@@ -37,10 +37,10 @@
         </div>
       </div>
 
-      <button v-if="!isStatic && hasMore && atLatest" class="msg-jump-fab msg-jump-top" @click="jumpToTop">
+      <button v-if="!isStatic && hasOlder" class="msg-jump-fab msg-jump-top" @click="jumpToTop">
         ↑ 最早消息
       </button>
-      <button v-if="!isStatic && !atLatest" class="msg-jump-fab msg-jump-bottom" @click="jumpToBottom">
+      <button v-if="!isStatic && hasNewer" class="msg-jump-fab msg-jump-bottom" @click="jumpToBottom">
         ↓ 最新消息
       </button>
       <div class="msg-list" :class="{ 'msg-list-static': isStatic }" ref="listRef">
@@ -48,7 +48,7 @@
         <div v-else-if="loadError" role="alert" class="msg-loading">
           {{ loadError }} <button @click="fetchMessages(conversation.conv_id)">重试</button>
         </div>
-        <div v-if="hasMore && !loading && atLatest" class="msg-load-more" @click="loadMore">
+        <div v-if="hasOlder && !loading" class="msg-load-more" @click="loadOlder">
           ⬆ 加载更早消息
         </div>
         <template v-for="(msg, index) in messages" :key="msg.msg_id">
@@ -261,7 +261,7 @@
           </template>
         </div>
         </template>
-        <div v-if="hasMore && !loading && !atLatest" class="msg-load-more" @click="loadMore">
+        <div v-if="hasNewer && !loading" class="msg-load-more" @click="loadNewer">
           ⬇ 加载更新消息
         </div>
         <div v-if="messages.length === 0 && !loading && !loadError" class="msg-no-data">
@@ -305,8 +305,8 @@ const messages = ref([])
 const total = ref(0)
 const loading = ref(false)
 let scrollLocked = false  // 防止程序化滚动触发无限加载
-const hasMore = ref(false)
-const atLatest = ref(true)  // 当前是否在查看最新消息
+const hasOlder = ref(false)
+const hasNewer = ref(false)
 const listRef = ref(null)
 const senders = ref([])
 const selfUid = ref(props.selfUidOverride || localStorage.getItem('selfUid') || '')
@@ -558,8 +558,8 @@ async function jumpToRefMsg(ref) {
     loading.value = false
     messages.value = data.items
     total.value = data.total
-    hasMore.value = messages.value.length < data.total
-    atLatest.value = false
+    hasOlder.value = data.has_older ?? true
+    hasNewer.value = data.has_newer ?? true
     loadUserInfoForMessages(data.items)
     loadSysRefs(data.items)
     await nextTick()
@@ -598,7 +598,7 @@ async function fetchSenders(convId) {
   } catch {}
 }
 
-async function fetchMessages(convId, beforeSeq = null, afterSeq = null) {
+async function fetchMessages(convId, beforeSeq = null, afterSeq = null, replace = false) {
   const requestId = ++messageRequestId
   loading.value = true
   loadError.value = ''
@@ -630,55 +630,58 @@ async function fetchMessages(convId, beforeSeq = null, afterSeq = null) {
   if (beforeSeq === null && afterSeq === null) {
     // 初始加载（最新消息）
     messages.value = data.items
-    atLatest.value = true
+    hasOlder.value = !!data.has_older
+    hasNewer.value = !!data.has_newer
     await nextTick()
     if (listRef.value) listRef.value.scrollTop = listRef.value.scrollHeight
-  } else if (afterSeq !== null && afterSeq === 0) {
-    // 跳到最早消息
+  } else if (replace) {
+    // 从搜索、日期或引用结果跳入会话中间；页面两侧都可能还有消息。
     messages.value = data.items
-    atLatest.value = false
+    hasOlder.value = !!data.has_older
+    hasNewer.value = !!data.has_newer
     await nextTick()
-    if (listRef.value) listRef.value.scrollTop = 0
+    if (afterSeq === 0 && listRef.value) listRef.value.scrollTop = 0
   } else if (afterSeq !== null) {
-    // 向下加载更新的消息（从最早端向下加载更多）
+    // 向下加载更新的消息。
     messages.value = [...messages.value, ...data.items]
+<<<<<<< HEAD
     // 日期/搜索跳转也走此分支，不能沿用跳转前的“已到最新”状态。
     atLatest.value = false
     // 如果没有更多新消息了，说明已到达最新
     if (data.items.length === 0 || messages.value.length >= data.total) {
       atLatest.value = true
     }
+=======
+    hasNewer.value = data.items.length > 0 && !!data.has_newer
+>>>>>>> origin/pr-38
   } else {
     // 加载更早的消息（向上加载更多）
     const list = listRef.value
     const prevHeight = list ? list.scrollHeight : 0
     messages.value = [...data.items, ...messages.value]
+    hasOlder.value = data.items.length > 0 && !!data.has_older
     await nextTick()
     if (list) list.scrollTop = list.scrollHeight - prevHeight
   }
   setTimeout(() => { scrollLocked = false }, 200)
 
   total.value = data.total
-  hasMore.value = messages.value.length < data.total
-
   // 异步加载用户信息（头像、昵称）
   loadUserInfoForMessages(data.items)
   // 异步加载系统消息引用的视频
   loadSysRefs(data.items)
 }
 
-function loadMore() {
-  if (props.conversation && messages.value.length > 0) {
-    if (atLatest.value) {
-      // 在最新端：向上加载更早的消息
-      const minSeq = Math.min(...messages.value.map(m => m.seq))
-      fetchMessages(props.conversation.conv_id, minSeq)
-    } else {
-      // 在最早端（跳转到顶部后）：向下加载更新的消息
-      const maxSeq = Math.max(...messages.value.map(m => m.seq))
-      fetchMessages(props.conversation.conv_id, null, maxSeq)
-    }
-  }
+function loadOlder() {
+  if (!props.conversation || !messages.value.length || !hasOlder.value || loading.value) return
+  const minSeq = Math.min(...messages.value.map(m => m.seq))
+  fetchMessages(props.conversation.conv_id, minSeq)
+}
+
+function loadNewer() {
+  if (!props.conversation || !messages.value.length || !hasNewer.value || loading.value) return
+  const maxSeq = Math.max(...messages.value.map(m => m.seq))
+  fetchMessages(props.conversation.conv_id, null, maxSeq)
 }
 
 // 截图模式：一次性加载闭区间消息，等用户信息与引用卡片就绪后通知父组件
@@ -694,8 +697,8 @@ async function fetchStaticRange(convId) {
     clearCjCache()
     messages.value = data.items
     total.value = data.total
-    hasMore.value = false
-    atLatest.value = true
+    hasOlder.value = false
+    hasNewer.value = false
     await loadUserInfoForMessages(data.items)
     await loadSysRefs(data.items)
   } catch (e) {
@@ -709,7 +712,7 @@ async function fetchStaticRange(convId) {
 
 async function jumpToTop() {
   if (!props.conversation) return
-  await fetchMessages(props.conversation.conv_id, null, 0)
+  await fetchMessages(props.conversation.conv_id, null, 0, true)
 }
 
 async function jumpToBottom() {
@@ -723,23 +726,19 @@ let scrollDebounce = null
 function onListScroll() {
   if (scrollDebounce || scrollLocked) return
   const list = listRef.value
-  if (!list || loading.value || !hasMore.value) return
+  if (!list || loading.value) return
   if (!props.conversation) return  // scroll event after the conversation was cleared
   const threshold = 100
   // 滚到顶部附近 → 加载更早消息
-  if (list.scrollTop < threshold) {
-    const minSeq = Math.min(...messages.value.map(m => m.seq))
-    if (minSeq > 1) {
-      scrollDebounce = true
-      fetchMessages(props.conversation.conv_id, minSeq)
-      setTimeout(() => { scrollDebounce = false }, 500)
-    }
-  }
-  // 滚到底部附近 → 加载更新消息
-  if (list.scrollHeight - list.scrollTop - list.clientHeight < threshold && !atLatest.value) {
+  if (list.scrollTop < threshold && hasOlder.value) {
     scrollDebounce = true
-    const maxSeq = Math.max(...messages.value.map(m => m.seq))
-    fetchMessages(props.conversation.conv_id, null, maxSeq)
+    loadOlder()
+    setTimeout(() => { scrollDebounce = false }, 500)
+  }
+  // 滚到底部附近 → 加载更新消息。
+  if (list.scrollHeight - list.scrollTop - list.clientHeight < threshold && hasNewer.value) {
+    scrollDebounce = true
+    loadNewer()
     setTimeout(() => { scrollDebounce = false }, 500)
   }
 }
@@ -791,6 +790,8 @@ watch(() => props.conversation, (conv) => {
   if (props.embeddedMessages) return
   if (conv) {
     messages.value = []
+    hasOlder.value = false
+    hasNewer.value = false
     clearCjCache()
     if (isStatic.value) {
       fetchStaticRange(conv.conv_id)
@@ -808,7 +809,8 @@ watch(() => props.embeddedMessages, (items) => {
   if (!items) return
   messages.value = items
   total.value = items.length
-  hasMore.value = false
+  hasOlder.value = false
+  hasNewer.value = false
   loadUserInfoForMessages(items)
 }, { immediate: true })
 
@@ -819,7 +821,7 @@ watch(() => props.jumpToSeq, async (seq) => {
     messages.value = []
     clearCjCache()
     const targetSeq = Math.max(0, seq - 50)
-    await fetchMessages(props.conversation.conv_id, null, targetSeq)
+    await fetchMessages(props.conversation.conv_id, null, targetSeq, true)
     await nextTick()
     // 精确滚动到目标消息并高亮
     const targetMsg = messages.value.find(m => m.seq === seq)
