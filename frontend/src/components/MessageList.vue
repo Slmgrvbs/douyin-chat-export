@@ -644,16 +644,7 @@ async function fetchMessages(convId, beforeSeq = null, afterSeq = null, replace 
   } else if (afterSeq !== null) {
     // 向下加载更新的消息。
     messages.value = [...messages.value, ...data.items]
-<<<<<<< HEAD
-    // 日期/搜索跳转也走此分支，不能沿用跳转前的“已到最新”状态。
-    atLatest.value = false
-    // 如果没有更多新消息了，说明已到达最新
-    if (data.items.length === 0 || messages.value.length >= data.total) {
-      atLatest.value = true
-    }
-=======
     hasNewer.value = data.items.length > 0 && !!data.has_newer
->>>>>>> origin/pr-38
   } else {
     // 加载更早的消息（向上加载更多）
     const list = listRef.value
