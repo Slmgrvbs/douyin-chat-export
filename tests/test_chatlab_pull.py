@@ -35,7 +35,7 @@ def _seed(temp_db, n=5, conv_type=1, monkeypatch=None):
 
 def test_sessions_discovery_lists_only_conversations_with_messages(temp_db, monkeypatch):
     client = _seed(temp_db, monkeypatch=monkeypatch)
-    r = client.get("/api/chatlab/sessions?format=chatlab")
+    r = client.get("/api/v1/sessions?format=chatlab")
     assert r.status_code == 200
     sessions = r.json()["sessions"]
     assert [s["id"] for s in sessions] == [CONV]
@@ -43,8 +43,8 @@ def test_sessions_discovery_lists_only_conversations_with_messages(temp_db, monk
     assert s["name"] == "与冬季的对话" and s["platform"] == "douyin" and s["type"] == "private"
     assert s["messageCount"] == 5 and s["memberCount"] == 2 and s["lastMessageAt"] == T0 + 5
 
-    assert client.get("/api/chatlab/sessions?keyword=不存在").json()["sessions"] == []
-    assert len(client.get("/api/chatlab/sessions?keyword=冬季").json()["sessions"]) == 1
+    assert client.get("/api/v1/sessions?keyword=不存在").json()["sessions"] == []
+    assert len(client.get("/api/v1/sessions?keyword=冬季").json()["sessions"]) == 1
 
 
 def test_full_pull_pages_through_nextsince_chain(temp_db, monkeypatch):
@@ -52,7 +52,7 @@ def test_full_pull_pages_through_nextsince_chain(temp_db, monkeypatch):
     seen = []
     since, pages = 0, 0
     while True:
-        r = client.get(f"/api/chatlab/sessions/{CONV}/messages",
+        r = client.get(f"/api/v1/sessions/{CONV}/messages",
                        params={"format": "chatlab", "since": since, "limit": 2})
         assert r.status_code == 200
         body = r.json()
@@ -90,11 +90,11 @@ def test_page_cut_inside_same_second_completes_the_group(temp_db, monkeypatch):
                    msg_type=1, timestamp=T0 + 3)
     conn.commit()
     conn.close()
-    page1 = client.get(f"/api/chatlab/sessions/{CONV}/messages",
+    page1 = client.get(f"/api/v1/sessions/{CONV}/messages",
                        params={"since": 0, "limit": 2}).json()
     assert [m["platformMessageId"] for m in page1["messages"]] == ["srv_1", "srv_2", "srv_3", "srv_4"]
     assert page1["sync"] == {"hasMore": True, "nextSince": T0 + 2 + 1 + PULL_LOOKBACK_SECONDS}
-    page2 = client.get(f"/api/chatlab/sessions/{CONV}/messages",
+    page2 = client.get(f"/api/v1/sessions/{CONV}/messages",
                        params={"since": page1["sync"]["nextSince"], "limit": 2}).json()
     assert [m["platformMessageId"] for m in page2["messages"]] == ["srv_5"]
     assert page2["sync"]["hasMore"] is False
@@ -104,7 +104,7 @@ def test_incremental_pull_after_cursor_reset_looks_back(temp_db, monkeypatch):
     """A wall-clock ``since`` (ChatLab's error path) must still return recent messages."""
     client = _seed(temp_db, n=5, monkeypatch=monkeypatch)
     wall_clock = T0 + 5 + 3600  # an hour after the newest message
-    body = client.get(f"/api/chatlab/sessions/{CONV}/messages",
+    body = client.get(f"/api/v1/sessions/{CONV}/messages",
                       params={"since": wall_clock, "limit": 100}).json()
     assert [m["platformMessageId"] for m in body["messages"]] == [f"srv_{i}" for i in range(1, 6)]
     assert body["sync"] == {"hasMore": False, "nextSince": T0 + 5 + 1 + PULL_LOOKBACK_SECONDS}
@@ -113,7 +113,7 @@ def test_incremental_pull_after_cursor_reset_looks_back(temp_db, monkeypatch):
 def test_empty_increment_is_small_and_keeps_cursor(temp_db, monkeypatch):
     client = _seed(temp_db, n=3, monkeypatch=monkeypatch)
     since = T0 + 3 + PULL_LOOKBACK_SECONDS + 1  # window starts after the newest message
-    r = client.get(f"/api/chatlab/sessions/{CONV}/messages", params={"since": since})
+    r = client.get(f"/api/v1/sessions/{CONV}/messages", params={"since": since})
     body = r.json()
     assert body["messages"] == [] and "members" not in body
     assert body["sync"] == {"hasMore": False, "nextSince": since}
@@ -128,7 +128,7 @@ def test_images_are_labels_not_data_urls(temp_db, monkeypatch):
                    media_url="https://cdn/pic.jpg", timestamp=T0 + 2)
     conn.commit()
     conn.close()
-    body = client.get(f"/api/chatlab/sessions/{CONV}/messages", params={"since": 0}).json()
+    body = client.get(f"/api/v1/sessions/{CONV}/messages", params={"since": 0}).json()
     img = next(m for m in body["messages"] if m["platformMessageId"] == "srv_img")
     assert img == {"sender": "111", "accountName": "冬季", "timestamp": T0 + 2,
                    "type": 1, "content": "[图片]", "platformMessageId": "srv_img"}
@@ -136,8 +136,8 @@ def test_images_are_labels_not_data_urls(temp_db, monkeypatch):
 
 def test_unknown_conversation_and_bad_format(temp_db, monkeypatch):
     client = _seed(temp_db, monkeypatch=monkeypatch)
-    assert client.get("/api/chatlab/sessions/nope/messages").status_code == 404
-    assert client.get(f"/api/chatlab/sessions/{CONV}/messages?format=csv").status_code == 400
+    assert client.get("/api/v1/sessions/nope/messages").status_code == 404
+    assert client.get(f"/api/v1/sessions/{CONV}/messages?format=csv").status_code == 400
 
 
 def test_api_token_authorizes_pull_endpoints(temp_db, monkeypatch):
@@ -145,8 +145,8 @@ def test_api_token_authorizes_pull_endpoints(temp_db, monkeypatch):
     client = _seed(temp_db)
     monkeypatch.setattr(main, "_get_password_hash", lambda: "hash")
     monkeypatch.setattr(config, "get_api_token", lambda: "tok123")
-    assert client.get("/api/chatlab/sessions").status_code == 401
-    assert client.get("/api/chatlab/sessions",
+    assert client.get("/api/v1/sessions").status_code == 401
+    assert client.get("/api/v1/sessions",
                       headers={"Authorization": "Bearer tok123"}).status_code == 200
-    assert client.get(f"/api/chatlab/sessions/{CONV}/messages",
+    assert client.get(f"/api/v1/sessions/{CONV}/messages",
                       headers={"Authorization": "Bearer tok123"}).status_code == 200

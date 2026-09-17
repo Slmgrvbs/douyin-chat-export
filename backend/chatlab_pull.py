@@ -3,9 +3,12 @@
 ChatLab 可以把本服务添加为「远程数据源」，自己定时来拉取增量消息：
 https://docs.chatlab.fun/cn/standard/chatlab-pull
 
-    GET /api/chatlab/sessions                         会话发现
-    GET /api/chatlab/sessions/{conv_id}/messages      ChatLab Format + sync 分页
+    GET /api/v1/sessions                         会话发现
+    GET /api/v1/sessions/{conv_id}/messages      ChatLab Format + sync 分页
 
+路径前缀是 ``/api/v1`` 而不是 ``/api/chatlab``：ChatLab 客户端会把用户填写的数据源
+地址强制补上 ``/api/v1``（它把任何数据源都当成另一台 ChatLab 的 API 布局），所以用户
+在 ChatLab 里只需填本服务根地址 ``http://host:8000``。
 只读 GET，沿用永久 API token 鉴权（见 backend.main.auth_middleware）。
 消息转换逻辑与文件导出共用 extractor.exporter，图片不内嵌 base64（用 [图片] 标签）。
 
@@ -35,7 +38,7 @@ from extractor.exporter import (
     sender_display_name,
 )
 
-chatlab_router = APIRouter(prefix="/api/chatlab", tags=["chatlab"])
+chatlab_router = APIRouter(prefix="/api/v1", tags=["chatlab"])
 
 # 回看窗口：要大于「采集可能中断的最长时间」。改小会让 ChatLab 已保存的游标向后跳、
 # 产生漏洞，所以做成常量而不是配置项。

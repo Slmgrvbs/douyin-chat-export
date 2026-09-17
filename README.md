@@ -297,7 +297,7 @@ python3 export.py --filter "会话名称" --output data/export.jsonl
 
 | 字段 | 填写 |
 | --- | --- |
-| 地址 | `http://<本服务地址>:8000/api/chatlab` |
+| 地址 | `http://<本服务地址>:8000`（ChatLab 会自动补上 `/api/v1`） |
 | Token | `data/panel_config.json` 里的 `api_token`（或 `GET /api/token`） |
 
 然后从列表里勾选要同步的会话。ChatLab 首次会分页拉取全部历史，之后按你设置的间隔自动增量拉取；
@@ -305,8 +305,8 @@ python3 export.py --filter "会话名称" --output data/export.jsonl
 
 | 端点 | 说明 |
 | --- | --- |
-| `GET /api/chatlab/sessions` | 可同步的会话列表（`keyword` / `limit` 可选） |
-| `GET /api/chatlab/sessions/{conv_id}/messages?format=chatlab&since=0&limit=1000` | ChatLab 格式消息 + `sync` 分页块 |
+| `GET /api/v1/sessions` | 可同步的会话列表（`keyword` / `limit` 可选） |
+| `GET /api/v1/sessions/{conv_id}/messages?format=chatlab&since=0&limit=1000` | ChatLab 格式消息 + `sync` 分页块 |
 
 - 与文件导出相比，通过数据源同步的消息**不内嵌图片**（图片写为 `[图片]` 标签），其余转换规则相同。
 - `since` 被当作水位线并向前回看 7 天：本服务是定时批量采集、消息时间戳早于采集时间，而 ChatLab 拉取出错时会把游标重置为当前时间，回看窗口保证这种情况下也不会漏消息（重复部分由 ChatLab 去重）。返回的 `nextSince` 已包含该偏移，ChatLab 原样回传即可，正常情况下每次只从上一页末尾继续。
@@ -375,8 +375,8 @@ API token 只授权 **GET** 端点——删除操作和控制面板仍需面板�
 | `GET /api/conversations/{conv_id}/messages/range?start_seq=100&end_seq=200` | seq 闭区间消息 |
 | `GET /api/conversations/{conv_id}/stats/daily?tz=8` | 逐日消息量统计 |
 | `GET /api/conversations/{conv_id}/screenshot?...` | **消息区间渲染成聊天长图（PNG）**，见下 |
-| `GET /api/chatlab/sessions` | ChatLab 远程数据源：会话发现（见[自动同步](#4-chatlab-自动同步远程数据源)） |
-| `GET /api/chatlab/sessions/{conv_id}/messages?format=chatlab&since=&limit=` | ChatLab 远程数据源：分页拉取 ChatLab 格式消息 |
+| `GET /api/v1/sessions` | ChatLab 远程数据源：会话发现（见[自动同步](#4-chatlab-自动同步远程数据源)） |
+| `GET /api/v1/sessions/{conv_id}/messages?format=chatlab&since=&limit=` | ChatLab 远程数据源：分页拉取 ChatLab 格式消息 |
 | `GET /api/search?q=关键词` | 搜索；可加 `conv_id`、`start_time`、`end_time`、`media_type=image/video/media`、`page`、`page_size`，日期／媒体筛选时可省略 q |
 | `GET /api/messages/{msg_id}/forward` | 合并转发详情；返回 `items`、`total`、`available`、`missing`、`complete` |
 | `GET /api/users/{uid}` | 用户信息（昵称 / 头像） |
