@@ -319,6 +319,10 @@ app.include_router(control_router)
 from backend.screenshot import screenshot_router
 app.include_router(screenshot_router)
 
+# ChatLab 远程数据源协议（Pull 模式）：ChatLab 定时来拉增量消息
+from backend.chatlab_pull import chatlab_router
+app.include_router(chatlab_router)
+
 
 @app.on_event("startup")
 async def startup():

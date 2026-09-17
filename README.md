@@ -45,6 +45,7 @@
 
 **导出 & 运维**
 - 导出 [ChatLab](https://github.com/hellodigua/ChatLab) 标准格式（JSON / JSONL），可直接做 AI 聊天分析
+- **ChatLab 远程数据源** — 实现 ChatLab [Pull 协议](https://docs.chatlab.fun/cn/standard/chatlab-pull)，在 ChatLab 里添加本服务地址即可自动定时增量同步，无需手动导出导入
 - 默认导出文件名包含会话名称和导出时间，多会话文件更易区分
 - **开放 API** — Bearer token 鉴权的只读 REST API：按日期 / seq 区间取消息、逐日消息量统计，供外部程序集成
 - **聊天长图渲染** — 一个 API 调用把任意消息区间渲染成聊天界面长图（PNG），5 套主题任选，可加标题栏
@@ -287,6 +288,29 @@ python3 export.py --filter "会话名称" --output data/export.jsonl
 - 普通回复和可匹配的视频引用写入 `replyToMessageId`。群聊保留群聊类型和成员名称。
 - 此格式面向聊天分析：表情、语音和视频不会打包成可播放的媒体附件。SQLite 备份也不包含 `data/media/`，完整备份需另外保存该目录。
 
+### 4. ChatLab 自动同步（远程数据源）
+
+不想反复手动导出导入的话，可以让 ChatLab 自己来拉：本服务实现了 ChatLab 的
+[Pull 远程数据源协议](https://docs.chatlab.fun/cn/standard/chatlab-pull)（只读 GET，用开放 API 的 token 鉴权）。
+
+在 ChatLab（桌面版 / CLI / Docker 均可）**设置 → 自动化 → 远程数据源** 里添加：
+
+| 字段 | 填写 |
+| --- | --- |
+| 地址 | `http://<本服务地址>:8000/api/chatlab` |
+| Token | `data/panel_config.json` 里的 `api_token`（或 `GET /api/token`） |
+
+然后从列表里勾选要同步的会话。ChatLab 首次会分页拉取全部历史，之后按你设置的间隔自动增量拉取；
+消息按 `platformMessageId` 去重，反复拉取不会产生重复。对应端点：
+
+| 端点 | 说明 |
+| --- | --- |
+| `GET /api/chatlab/sessions` | 可同步的会话列表（`keyword` / `limit` 可选） |
+| `GET /api/chatlab/sessions/{conv_id}/messages?format=chatlab&since=0&limit=1000` | ChatLab 格式消息 + `sync` 分页块 |
+
+- 与文件导出相比，通过数据源同步的消息**不内嵌图片**（图片写为 `[图片]` 标签），其余转换规则相同。
+- `since` 被当作水位线并向前回看 7 天：本服务是定时批量采集、消息时间戳早于采集时间，而 ChatLab 拉取出错时会把游标重置为当前时间，回看窗口保证这种情况下也不会漏消息（重复部分由 ChatLab 去重）。返回的 `nextSince` 已包含该偏移，ChatLab 原样回传即可，正常情况下每次只从上一页末尾继续。
+
 若采集时出现 `[media] emoji 失败 ... CERTIFICATE_VERIFY_FAILED`，这是媒体下载的证书校验失败，并非 ChatLab 文件写入失败。下载器使用系统证书库及公共 CA 证书；源码安装升级后请重新执行 `pip install -r requirements.txt`。使用自签证书的代理时，需要将其 CA 正确加入系统信任库，或通过 `SSL_CERT_FILE` 指向可信的 PEM 证书文件。Docker 容器需单独配置证书；不要关闭 TLS 校验。
 
 新采集的语音会自动转写。对已经保存的历史消息，可在控制面板 **采集** 分区点击「补充历史语音转写」，或执行 `python3 extract.py --transcribe-voices`。任务只处理尚未完成的语音，不会重新采集全部聊天记录；缺少的发送者信息会在需要时自动补充。
@@ -351,6 +375,8 @@ API token 只授权 **GET** 端点——删除操作和控制面板仍需面板�
 | `GET /api/conversations/{conv_id}/messages/range?start_seq=100&end_seq=200` | seq 闭区间消息 |
 | `GET /api/conversations/{conv_id}/stats/daily?tz=8` | 逐日消息量统计 |
 | `GET /api/conversations/{conv_id}/screenshot?...` | **消息区间渲染成聊天长图（PNG）**，见下 |
+| `GET /api/chatlab/sessions` | ChatLab 远程数据源：会话发现（见[自动同步](#4-chatlab-自动同步远程数据源)） |
+| `GET /api/chatlab/sessions/{conv_id}/messages?format=chatlab&since=&limit=` | ChatLab 远程数据源：分页拉取 ChatLab 格式消息 |
 | `GET /api/search?q=关键词` | 搜索；可加 `conv_id`、`start_time`、`end_time`、`media_type=image/video/media`、`page`、`page_size`，日期／媒体筛选时可省略 q |
 | `GET /api/messages/{msg_id}/forward` | 合并转发详情；返回 `items`、`total`、`available`、`missing`、`complete` |
 | `GET /api/users/{uid}` | 用户信息（昵称 / 头像） |
