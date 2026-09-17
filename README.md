@@ -121,6 +121,21 @@ docker compose up -d
 
 使用南京大学镜像代理时，新标签可能因缓存而稍晚可见；发布后需要立即更新时，优先直接从 `ghcr.io` 拉取完整版本号。
 
+#### 版本记录与正式发布
+
+每个正式版本的新增功能、修复和升级说明见 [Releases](https://github.com/TeamBreakerr/douyin-chat-export/releases)。
+镜像文件保存在 [GHCR Packages](https://github.com/TeamBreakerr/douyin-chat-export/pkgs/container/douyin-chat-export)。
+
+维护者发布新版本时：
+
+1. 在 `docs/releases/vX.Y.Z.md` 编写中文更新说明，分别列出新增功能、修复与升级方式，并提交到待发布代码中。
+2. 在该提交上创建并推送 `vX.Y.Z` 标签，例如 `git tag v2.0.1` 后执行 `git push origin v2.0.1`。
+3. CI 通过测试并发布双架构镜像后，自动创建同名 GitHub Release，使用上述说明文件；没有说明文件时回退为 GitHub 自动生成的变更记录和镜像安装说明。
+
+正式版本会更新对应版本镜像标签及 `latest`；带 `-` 的预发布版本不会更新 `latest`，并标记为 Pre-release。
+重复运行 CI 会保留已有 Release 的说明，需要修改时可在 Releases 页面编辑。
+仅调整 `latest` 指向时，使用 Actions 中的 **Promote Docker image** 工作流，填写已有镜像标签；该操作不创建新的正式版本记录。
+
 <details>
 <summary><b>从源码构建</b>（想改代码或不信任预构建镜像时）</summary>
 
