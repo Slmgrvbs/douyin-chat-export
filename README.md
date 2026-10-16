@@ -380,6 +380,8 @@ API token 只授权 **GET** 端点——删除操作和控制面板仍需面板�
 | `GET /api/search?q=关键词` | 搜索；可加 `conv_id`、`start_time`、`end_time`、`media_type=image/video/media`、`page`、`page_size`，日期／媒体筛选时可省略 q |
 | `GET /api/messages/{msg_id}/forward` | 合并转发详情；返回 `items`、`total`、`available`、`missing`、`complete` |
 | `GET /api/users/{uid}` | 用户信息（昵称 / 头像） |
+| `GET /api/stickers?sender_uid=<uid>` | **某个人发过的表情包目录**：只算已下载到本地的表情包，按图片内容 MD5 去重，带使用次数、首末次使用时间；可加 `conv_id`、`min_count`（至少发过几次）、`samples`（每张附带最多几次使用时间，均匀分布，≤50） |
+| `GET /api/stickers/{md5}` | 表情包图片本身（`md5` 来自上面的目录） |
 
 **聊天长图渲染**：服务端用无头浏览器打开内置浏览界面的截图模式，整段消息渲染为一张 PNG
 （表情包 / 图片 / 引用 / 撤回标记与网页端完全一致，全程本地渲染，内容不出机器）：

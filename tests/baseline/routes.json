@@ -15,6 +15,8 @@
   "GET /api/messages/{msg_id}/referenced-video",
   "GET /api/search",
   "GET /api/stats",
+  "GET /api/stickers",
+  "GET /api/stickers/{sticker_id}",
   "GET /api/token",
   "GET /api/users",
   "GET /api/users/{uid}",
