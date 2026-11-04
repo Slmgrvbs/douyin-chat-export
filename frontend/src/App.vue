@@ -12,11 +12,14 @@ const activeConversation = ref(null)
 const searchHighlight = ref('')
 const jumpToSeq = ref(null)
 const mobileLayout = window.matchMedia('(max-width: 768px)')
-const sidebarOpen = ref(!mobileLayout.matches)
-const syncSidebarLayout = () => { sidebarOpen.value = !mobileLayout.matches }
+// 手机端还没选会话时直接展开会话列表，省一次点击
+const sidebarOpen = ref(true)
+const syncSidebarLayout = () => { sidebarOpen.value = !mobileLayout.matches || !activeConversation.value }
 mobileLayout.addEventListener('change', syncSidebarLayout)
 onUnmounted(() => mobileLayout.removeEventListener('change', syncSidebarLayout))
 const searchOpen = ref(false)
+// 手机端点结果跳转后，查找面板只隐藏不卸载，再点“查找”能回到原来的结果
+const searchMounted = ref(false)
 const readerLayout = ref(null)
 async function setSearchOpen(open) {
   const list = readerLayout.value?.querySelector('.msg-list')
@@ -25,10 +28,15 @@ async function setSearchOpen(open) {
   const anchor = list && [...list.querySelectorAll(':scope > .msg-item')].find(row => row.getBoundingClientRect().bottom > top)
   const offset = anchor?.getBoundingClientRect().top
   searchOpen.value = open
+  if (open) searchMounted.value = true
   await nextTick()
   if (!list?.isConnected) return
   if (bottom) list.scrollTop = list.scrollHeight - list.clientHeight
   else if (anchor?.isConnected) list.scrollTop += anchor.getBoundingClientRect().top - offset
+}
+function closeSearch() {
+  searchMounted.value = false
+  setSearchOpen(false)
 }
 
 // Auth
@@ -128,6 +136,8 @@ function navigateToMessage(item) {
   }
   searchHighlight.value = item.search_query ?? ''
   jumpToSeq.value = item.seq || null
+  // 手机端查找面板盖住了聊天区，跳转后先收起它（覆盖层，不影响聊天区排版，无需滚动锚定）
+  if (mobileLayout.matches) searchOpen.value = false
 }
 </script>
 
@@ -173,8 +183,11 @@ function navigateToMessage(item) {
         <button class="sidebar-toggle" :aria-label="sidebarOpen ? '收起会话列表' : '展开会话列表'" :title="sidebarOpen ? '收起会话列表' : '展开会话列表'" :aria-expanded="sidebarOpen" aria-controls="conversation-sidebar" @click="sidebarOpen = !sidebarOpen">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
         </button>
-        <div class="app-title">抖音聊天记录</div>
-        <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" @click="setSearchOpen(!searchOpen)">⌕ 查找聊天记录</button>
+        <div class="app-title"><span>抖音聊天记录</span></div>
+        <button class="search-toggle" :disabled="!activeConversation" :aria-expanded="searchOpen" aria-label="查找聊天记录" title="查找聊天记录" @click="searchOpen ? closeSearch() : setSearchOpen(true)">
+          <svg class="search-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span class="search-toggle-label">⌕ 查找聊天记录</span>
+        </button>
         <div class="theme-switcher">
           <button
             v-for="t in themes"
@@ -194,8 +207,8 @@ function navigateToMessage(item) {
           :jumpToSeq="jumpToSeq"
           @jumped="jumpToSeq = null"
         />
-        <div v-if="searchOpen && activeConversation" class="search-slot">
-          <SearchBar :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="setSearchOpen(false)" />
+        <div v-if="searchMounted && activeConversation" v-show="searchOpen" class="search-slot">
+          <SearchBar :convId="activeConversation.conv_id" :convName="activeConversation.name" @navigate="navigateToMessage" @close="closeSearch" />
         </div>
       </div>
     </div>
@@ -220,7 +233,12 @@ function navigateToMessage(item) {
 @media (max-width: 800px) {
   .search-slot { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 120; box-shadow: -8px 0 28px #0003; }
 }
+/* 手机竖屏：查找面板占满聊天区，不留一条看不清的聊天缝 */
+@media (max-width: 600px) {
+  .search-slot { width: 100%; box-shadow: none; }
+}
 .search-toggle { padding: 5px 10px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.search-toggle-icon { display: none; width: 18px; height: 18px; }
 .search-toggle:hover:not(:disabled), .search-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .search-toggle:disabled { opacity: .4; cursor: default; }
 
@@ -229,6 +247,8 @@ function navigateToMessage(item) {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
+  padding: 16px;
   background: var(--bg-primary);
 }
 .login-box {
@@ -237,7 +257,7 @@ function navigateToMessage(item) {
   background: var(--bg-secondary);
   border-radius: 16px;
   border: 1px solid var(--border-color);
-  min-width: 300px;
+  min-width: min(300px, 100%);
 }
 .login-title {
   font-size: 22px;
@@ -295,6 +315,7 @@ function navigateToMessage(item) {
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
 }
 
 .app-sidebar {
@@ -328,9 +349,15 @@ function navigateToMessage(item) {
   white-space: nowrap;
   color: var(--text-primary);
   letter-spacing: 0.01em;
+  min-width: 0;
+}
+.app-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .app-title::before {
   content: "";
+  flex-shrink: 0;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -398,9 +425,10 @@ function navigateToMessage(item) {
     left: 0;
     top: 0;
     height: 100vh;
+    height: 100dvh;
     z-index: 1000;
     transform: translateX(-100%);
-    width: 280px;
+    width: min(300px, 85vw);
   }
 
   .app-sidebar.open {
@@ -422,10 +450,15 @@ function navigateToMessage(item) {
     pointer-events: auto;
   }
 
+  /* 工具栏压成一行：标题可省略、查找只留图标，主题色点缩小 */
   .app-toolbar {
-    flex-wrap: wrap;
-    padding: 8px 12px;
-    gap: 8px;
+    padding: 6px 10px 6px 4px;
+    gap: 6px;
+    min-height: 48px;
+  }
+
+  .sidebar-toggle {
+    padding: 8px;
   }
 
   .app-title {
@@ -433,10 +466,34 @@ function navigateToMessage(item) {
     font-size: 14px;
   }
 
+  .search-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 8px;
+  }
+  .search-toggle-icon { display: block; }
+  .search-toggle-label { display: none; }
+
   .theme-switcher {
-    order: 0;
+    flex-shrink: 0;
     margin-left: 0;
-    gap: 5px;
+    gap: 4px;
+  }
+
+  .theme-btn {
+    width: 22px;
+    height: 22px;
+    border: 4px solid var(--bg-secondary);
+    box-sizing: border-box;
+    background-clip: padding-box;
+  }
+  .theme-btn.active {
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
 }

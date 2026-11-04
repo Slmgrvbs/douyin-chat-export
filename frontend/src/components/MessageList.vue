@@ -849,13 +849,21 @@ watch(() => props.jumpToSeq, async (seq) => {
 .msg-header h3 {
   font-size: 15px;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .msg-total {
   font-size: 12px;
   color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .msg-pick-self {
+  white-space: nowrap;
+  flex-shrink: 0;
   margin-left: auto;
   padding: 4px 12px;
   border: 1px solid var(--border-color);
@@ -882,7 +890,8 @@ watch(() => props.jumpToSeq, async (seq) => {
   background: var(--bg-secondary);
   border-radius: 12px;
   padding: 24px;
-  min-width: 280px;
+  min-width: min(280px, 90vw);
+  max-width: 90vw;
   box-shadow: 0 8px 30px rgba(0,0,0,0.4);
 }
 .picker-title {
@@ -1472,5 +1481,42 @@ watch(() => props.jumpToSeq, async (seq) => {
   padding: 1px 5px;
   border-radius: 3px;
   margin-right: 4px;
+}
+
+/* 手机端：收紧边距、放宽气泡、媒体不超出屏幕。
+   截图模式（msg-panel-static，默认 520px 宽）不吃这些规则，保持导出图样式不变。 */
+@media (max-width: 768px) {
+  .msg-header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .msg-header h3 { font-size: 14px; }
+  .msg-pick-self { padding: 4px 10px; }
+
+  .msg-panel:not(.msg-panel-static) .msg-list { padding: 8px 10px 24px; }
+  .msg-panel:not(.msg-panel-static) .msg-item {
+    gap: 8px;
+    max-width: 88%;
+  }
+  .msg-panel:not(.msg-panel-static) .msg-item.msg-system { max-width: 100%; }
+  .msg-panel:not(.msg-panel-static) .msg-item.group-start { margin-top: 12px; }
+  .msg-panel:not(.msg-panel-static) .msg-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  .msg-panel:not(.msg-panel-static) .msg-system-block { max-width: 92%; }
+
+  .msg-panel:not(.msg-panel-static) .msg-media img { max-width: min(240px, 60vw); }
+  .msg-panel:not(.msg-panel-static) .msg-media video,
+  .msg-panel:not(.msg-panel-static) .msg-video-player { max-width: min(280px, 64vw); }
+  .msg-panel:not(.msg-panel-static) .msg-share-card { max-width: min(320px, 70vw); }
+  .msg-panel:not(.msg-panel-static) .msg-ref-quote { max-width: min(300px, 70vw); }
+  .msg-panel:not(.msg-panel-static) .msg-voice-bubble { max-width: min(360px, 70vw); }
+
+  .msg-jump-fab {
+    right: 14px;
+    padding: 8px 14px;
+  }
+  .msg-jump-top, .msg-jump-bottom { bottom: 18px; }
 }
 </style>

@@ -262,6 +262,23 @@ onMounted(() => {
   background: #e53935;
   color: #fff;
 }
+/* 触屏没有 hover：删除按钮常显（淡色），免得隐形按钮被误点；加大点击区 */
+@media (hover: none) {
+  .conv-delete {
+    opacity: 0.55;
+    width: 32px;
+    height: 32px;
+    margin-right: -6px;
+  }
+  .conv-delete:hover {
+    background: transparent;
+    color: var(--text-muted);
+  }
+}
+@media (max-width: 768px) {
+  .conv-header { padding: 12px 14px; }
+  .conv-item { padding: 10px 12px; }
+}
 
 .conv-empty {
   padding: 30px;
@@ -290,7 +307,7 @@ onMounted(() => {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  min-width: 320px;
+  min-width: min(320px, 90vw);
   max-width: 90vw;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   overflow: hidden;
